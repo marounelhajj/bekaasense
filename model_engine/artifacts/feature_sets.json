@@ -1,0 +1,41 @@
+{
+  "forecast": [
+    "month_sin",
+    "month_cos",
+    "dm_lag1",
+    "dm_lag2",
+    "dm_lag3",
+    "precip_lag1",
+    "temp_lag1",
+    "precip_roll3",
+    "precip_roll6",
+    "precip_roll12",
+    "dm_roll3",
+    "dm_roll6",
+    "temp_roll3",
+    "spi3_lag1",
+    "spi6_lag1"
+  ],
+  "nowcast": [
+    "month_sin",
+    "month_cos",
+    "precip_sum",
+    "temp_avg",
+    "temp_max",
+    "temp_min",
+    "dm_lag1",
+    "dm_lag2",
+    "dm_lag3",
+    "precip_lag1",
+    "temp_lag1",
+    "precip_roll3",
+    "precip_roll6",
+    "precip_roll12",
+    "dm_roll3",
+    "dm_roll6",
+    "temp_roll3",
+    "spi3",
+    "spi6",
+    "spi12"
+  ]
+}

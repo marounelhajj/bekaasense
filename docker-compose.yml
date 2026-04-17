@@ -1,0 +1,55 @@
+# ======================================================================
+# BekaaSense — docker-compose stack
+#
+#   web       : Django + DRF API + dashboard, served by gunicorn
+#   db        : Postgres (optional — the app falls back to SQLite if
+#               DATABASE_URL is not set, which is the default)
+#
+# Quick-start:  docker compose up --build
+# URLs:
+#   http://localhost:8000/             dashboard
+#   http://localhost:8000/api/         browsable API
+#   http://localhost:8000/health/      liveness probe
+# ======================================================================
+version: "3.9"
+
+services:
+  web:
+    build: .
+    image: bekaasense:latest
+    container_name: bekaasense-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DJANGO_DEBUG=0
+      - DJANGO_ALLOWED_HOSTS=*
+      # Uncomment to use Postgres instead of SQLite:
+      # - DATABASE_URL=postgresql://bekaa:bekaapass@db:5432/bekaasense
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./model_engine/artifacts:/app/model_engine/artifacts
+      - ./results:/app/results
+      - ./data/processed:/app/data/processed
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:16-alpine
+    container_name: bekaasense-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bekaa
+      POSTGRES_PASSWORD: bekaapass
+      POSTGRES_DB: bekaasense
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    # Not exposed externally — accessed via the internal compose network only.
+
+volumes:
+  pg_data:

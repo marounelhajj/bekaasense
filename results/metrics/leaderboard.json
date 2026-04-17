@@ -1,0 +1,47 @@
+[
+  {
+    "model": "LinearTrend",
+    "task": "regression",
+    "rmse": 20.64192615624062,
+    "mae": 17.839020935917283,
+    "r2": -0.04689715978480247,
+    "bias": 5.024730121766925
+  },
+  {
+    "model": "SARIMA",
+    "task": "regression",
+    "rmse": 8.150815787937665,
+    "mae": 4.376442399343963,
+    "r2": 0.83676783629693,
+    "bias": 1.9246334159324456
+  },
+  {
+    "model": "Rule",
+    "task": "binary-classification",
+    "f1_weighted": 0.815621429051556
+  },
+  {
+    "model": "RandomForest",
+    "task": "regression",
+    "rmse": 4.996237466843256,
+    "mae": 3.2137542236553025,
+    "r2": 0.9386676330948713,
+    "bias": 1.0520342205929811,
+    "interval_coverage_90": 0.8402777777777778
+  },
+  {
+    "model": "XGBoost",
+    "task": "regression",
+    "rmse": 5.754979697247345,
+    "mae": 3.842848083100041,
+    "r2": 0.9186249678654138,
+    "bias": 1.8023417307971725,
+    "interval_coverage_90": 0.9027777777777778
+  },
+  {
+    "model": "AridityZoneClassifier",
+    "task": "classification",
+    "f1_weighted": 0.90969244821799,
+    "f1_macro": 0.87069331081715
+  }
+]

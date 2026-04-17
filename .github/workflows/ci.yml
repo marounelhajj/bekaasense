@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint (compileall)
+        run: |
+          python -m compileall -q data_ingestion model_engine api dashboard bekaasense
+
+      - name: Generate synthetic dataset
+        run: python scripts/generate_synthetic.py
+
+      - name: Train models
+        run: python -m model_engine.train
+
+      - name: Run tests
+        run: pytest -v --cov=data_ingestion --cov=model_engine --cov=api
+
+      - name: Upload leaderboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leaderboard
+          path: results/metrics/leaderboard.*

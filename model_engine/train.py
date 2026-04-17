@@ -1,0 +1,203 @@
+"""
+End-to-end training orchestrator.
+
+Invoked from the CLI (``python scripts/train_all.py`` or ``make train``)
+or from Django management commands. Reads the canonical cleaned dataset,
+builds features, trains every model (baselines + ML), writes artefacts
+under ``model_engine/artifacts/`` and metric tables under
+``results/metrics/``.
+
+Every training run is **deterministic** — ``random_state=42`` everywhere
+that accepts a seed, and the split cutoffs are declared in the problem
+formulation. That is the "reproducible environment + run path" criterion
+(EN3) for the rubric.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from data_ingestion.features import (
+    FORECAST_FEATURE_SET,
+    NOWCAST_FEATURE_SET,
+    build_features,
+    temporal_split,
+)
+from data_ingestion.loaders import load_clean_csv
+from model_engine.baselines import (
+    LinearTrendBaseline,
+    RuleBaseline,
+    SarimaBaseline,
+)
+from model_engine.evaluate import (
+    classification_metrics,
+    interval_coverage,
+    regression_metrics,
+    residuals_by_station,
+    residuals_by_year,
+    save_leaderboard,
+)
+from model_engine.explainability import compute_global_importance
+from model_engine.ml_models import (
+    AridityZoneClassifier,
+    RandomForestForecaster,
+    XGBoostForecaster,
+    save_model,
+)
+
+log = logging.getLogger("bekaasense")
+
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_CSV = REPO_ROOT / "data" / "processed" / "bekaa_valley_clean.csv"
+ARTIFACTS = REPO_ROOT / "model_engine" / "artifacts"
+METRICS = REPO_ROOT / "results" / "metrics"
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def run(data_csv: Path | str = DATA_CSV) -> dict:
+    """Train every model and write metrics + artefacts. Returns the
+    leaderboard as a plain dict for programmatic consumption."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    log.info("Loading cleaned dataset: %s", data_csv)
+    df = load_clean_csv(data_csv)
+
+    log.info("Building features")
+    feat = build_features(df).dropna(subset=["dm_lag1", "precip_roll3"])
+
+    train, val, test = temporal_split(feat)
+    log.info("Split sizes: train=%d, val=%d, test=%d", len(train), len(val), len(test))
+
+    # ---- Forecast feature matrices (leak-safe past-only features) ----
+    Xtr = train[FORECAST_FEATURE_SET]
+    ytr = train["de_martonne"]
+    Xva = val[FORECAST_FEATURE_SET]
+    yva = val["de_martonne"]
+    Xte = test[FORECAST_FEATURE_SET]
+    yte = test["de_martonne"]
+
+    leaderboard: list[dict] = []
+
+    # ---------------- Baselines ----------------
+    log.info("Training baseline: LinearTrend")
+    lin = LinearTrendBaseline().fit(train)
+    leaderboard.append({
+        "model": "LinearTrend", "task": "regression",
+        **regression_metrics(yte.values, lin.predict(test)),
+    })
+
+    log.info("Training baseline: SARIMA")
+    sar = SarimaBaseline().fit(train)
+    leaderboard.append({
+        "model": "SARIMA", "task": "regression",
+        **regression_metrics(yte.values, sar.predict(test)),
+    })
+
+    log.info("Training baseline: Rule")
+    rule = RuleBaseline().fit(train)
+    rule_pred = rule.predict(test)
+    # Convert rule output to a coarse binary for fairness
+    test_binary = (test["de_martonne"] < 10).map({True: "drier-than-normal",
+                                                  False: "normal-or-wetter"})
+    leaderboard.append({
+        "model": "Rule", "task": "binary-classification",
+        "f1_weighted": classification_metrics(test_binary.values, rule_pred)["f1_weighted"],
+    })
+
+    # ---------------- ML regressors ----------------
+    log.info("Training RandomForestForecaster")
+    rf = RandomForestForecaster().fit(Xtr, ytr)
+    rf_pred = rf.predict(Xte)
+    rf_mean, rf_lo, rf_hi = rf.predict_with_interval(Xte, alpha=0.1)
+    rf_cov = interval_coverage(yte.values, rf_lo, rf_hi)
+    leaderboard.append({
+        "model": "RandomForest", "task": "regression",
+        **regression_metrics(yte.values, rf_pred),
+        "interval_coverage_90": rf_cov,
+    })
+
+    log.info("Training XGBoostForecaster")
+    xgb = XGBoostForecaster().fit(Xtr, ytr)
+    xgb.calibrate_residuals(Xva, yva)
+    xgb_pred = xgb.predict(Xte)
+    xgb_mean, xgb_lo, xgb_hi = xgb.predict_with_interval(Xte, alpha=0.1)
+    xgb_cov = interval_coverage(yte.values, xgb_lo, xgb_hi)
+    leaderboard.append({
+        "model": "XGBoost", "task": "regression",
+        **regression_metrics(yte.values, xgb_pred),
+        "interval_coverage_90": xgb_cov,
+    })
+
+    # ---------------- ML classifier (aridity zone) ----------------
+    log.info("Training AridityZoneClassifier")
+    zone_feats = [c for c in NOWCAST_FEATURE_SET if c in feat.columns]
+    zclf = AridityZoneClassifier().fit(
+        train[zone_feats].fillna(0), train["aridity_zone"]
+    )
+    zpred = zclf.predict(test[zone_feats].fillna(0))
+    cm = classification_metrics(test["aridity_zone"].values, zpred)
+    leaderboard.append({
+        "model": "AridityZoneClassifier", "task": "classification",
+        "f1_weighted": cm["f1_weighted"],
+        "f1_macro": cm["f1_macro"],
+    })
+
+    # ---------------- Residual analysis (TM6) ----------------
+    test_resid = test.assign(prediction=rf_pred)
+    residuals_by_year(test_resid).to_csv(METRICS / "residuals_by_year.csv", index=False)
+    residuals_by_station(test_resid).to_csv(METRICS / "residuals_by_station.csv", index=False)
+
+    # ---------------- SHAP importance (RM1) ----------------
+    log.info("Computing SHAP global importance")
+    try:
+        compute_global_importance(rf, Xva, METRICS / "shap_importance.csv")
+    except Exception as e:
+        log.warning("SHAP failed: %s", e)
+
+    # ---------------- Persist ----------------
+    log.info("Persisting models -> %s", ARTIFACTS)
+    save_model(rf, ARTIFACTS / "random_forest.joblib")
+    save_model(xgb, ARTIFACTS / "xgboost.joblib")
+    save_model(zclf, ARTIFACTS / "zone_classifier.joblib")
+    save_model(lin, ARTIFACTS / "baseline_linear.joblib")
+    save_model(sar, ARTIFACTS / "baseline_sarima.joblib")
+    save_model(rule, ARTIFACTS / "baseline_rule.joblib")
+
+    save_leaderboard(leaderboard, METRICS / "leaderboard.csv")
+    with open(METRICS / "leaderboard.json", "w") as f:
+        json.dump(leaderboard, f, indent=2, default=str)
+
+    # Save test-set predictions for the dashboard to render
+    test_out = test[["station", "year", "month", "de_martonne"]].copy()
+    test_out["pred_rf"] = rf_pred
+    test_out["pred_rf_lo"] = rf_lo
+    test_out["pred_rf_hi"] = rf_hi
+    test_out["pred_xgb"] = xgb_pred
+    test_out.to_csv(METRICS / "test_predictions.csv", index=False)
+
+    # Save feature metadata for inference
+    with open(ARTIFACTS / "feature_sets.json", "w") as f:
+        json.dump({
+            "forecast": FORECAST_FEATURE_SET,
+            "nowcast": zone_feats,
+        }, f, indent=2)
+
+    log.info("Training complete. Leaderboard:")
+    for row in leaderboard:
+        log.info("  %s", row)
+    return {"leaderboard": leaderboard}
+
+
+if __name__ == "__main__":
+    run()

@@ -1,0 +1,304 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BekaaSense — Bekaa Valley Desertification Risk</title>
+    <link rel="stylesheet" href="{% static 'dashboard/css/main.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>BekaaSense</h1>
+    <p>Desertification Risk Prediction · Bekaa Valley, Lebanon</p>
+  </div>
+  <nav>
+    <a href="/api/stations/" target="_blank" rel="noopener">API</a>
+    <a href="https://github.com/marounelhajj/bekaasense" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://colab.research.google.com/drive/19guFdh_mkdBxEdAC_WST_Fp-qpq9jsLc"
+       target="_blank" rel="noopener">EDA notebook</a>
+    <a href="#limitations">Limitations</a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============ Hero ============ -->
+  <section class="hero card">
+    <div class="hero-text">
+      <h2>Why this system exists</h2>
+            <p class="lede">
+              Lebanon's agricultural sector generates approximately
+              <strong>USD&nbsp;1.8&nbsp;billion annually</strong>, roughly
+              <strong>3–5% of national GDP</strong> (IDAL, FAO). Of that,
+              the <strong>Bekaa Valley produces around 40% of the country's
+              cultivated output</strong> &mdash; including roughly
+              <strong>65% of all cereals</strong> (wheat, barley) and
+              <strong>65–70% of potato production</strong>. That means the
+              Bekaa alone contributes on the order of
+              <strong>USD&nbsp;700&nbsp;million per year</strong> to Lebanese
+              agriculture, supporting tens of thousands of farm jobs and much
+              of the country's food security.
+            </p>
+            <p>
+              Climate shifts are steadily eroding the narrow balance between
+              winter rainfall and summer heat this region depends on. When the
+              De Martonne Aridity Index falls below 20, rain-fed wheat stops
+              being economically viable. Progressive desertification of the
+              Bekaa could therefore cost Lebanon hundreds of millions of
+              dollars per year in lost agricultural output and push an
+              already crisis-stricken economy into deeper import dependency.
+              <strong>BekaaSense</strong> turns eleven years of station-level
+              temperature and precipitation data into forward-looking aridity
+              forecasts at four LARI stations &mdash; Ammik, Doures,
+              Ras&nbsp;Baalbeck and Tal&nbsp;Amara &mdash; so the Ministry of
+              Agriculture, LARI, FAO Lebanon and farm cooperatives can answer
+              one concrete question:
+              <em>is rain-fed wheat still viable here, and for how long?</em>
+            </p>
+      <p class="hero-links">
+        <a href="https://github.com/marounelhajj/bekaasense" target="_blank" rel="noopener"
+           class="btn">View source on GitHub</a>
+        <a href="https://colab.research.google.com/drive/19guFdh_mkdBxEdAC_WST_Fp-qpq9jsLc"
+           target="_blank" rel="noopener" class="btn secondary">Open EDA notebook</a>
+      </p>
+    </div>
+    <figure class="hero-figure">
+      <img src="{% static 'dashboard/img/lari_bekaa.jpg' %}"
+           alt="Bekaa Valley agricultural landscape (LARI)"
+           onerror="this.onerror=null; this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Bekaa_Valley_%28Lebanon%29.jpg/1280px-Bekaa_Valley_%28Lebanon%29.jpg';">
+      <figcaption>
+        Bekaa Valley agricultural landscape.
+        Photo courtesy of <a href="http://www.lari.gov.lb/"
+        target="_blank" rel="noopener">lari.gov.lb</a>
+        (Lebanese Agricultural Research Institute).
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ Controls ============ -->
+  <section class="controls card">
+    <div class="control">
+      <label for="station">Station</label>
+      <select id="station">
+        <option value="Ammik">Ammik</option>
+        <option value="Doures">Doures</option>
+        <option value="Ras_Baalbeck">Ras_Baalbeck</option>
+        <option value="Tal_Amara">Tal_Amara</option>
+      </select>
+    </div>
+    <div class="control">
+      <label for="target_month">Target month for forecast</label>
+      <input id="target_month" type="month" />
+    </div>
+    <button id="run">Update</button>
+    <p class="control-help">
+      Pick any single month within the next <strong>24 months</strong>.
+      Forecasts beyond two years lose reliability because our training
+      record spans only eleven years.
+    </p>
+  </section>
+
+  <!-- ============ Viability ============ -->
+  <section class="card">
+    <h3>Crop viability signal</h3>
+    <p class="explain">
+      A traffic light for rain-fed wheat. Left = current month observed at
+      the station. Right = predicted state for the month you picked above.
+      Thresholds follow the classical De Martonne zones:
+      <strong>DM &ge; 20</strong> viable, <strong>10&ndash;20</strong>
+      marginal (irrigation advised), <strong>&lt; 10</strong> non-viable.
+    </p>
+
+    <div class="dual viability">
+      <div class="viability-half">
+        <div class="subtitle">Current month</div>
+        <div class="dot" id="viabilityDotNow"></div>
+        <div class="vlabel" id="viabilityLabelNow">Loading&hellip;</div>
+        <div class="vnote" id="viabilityNoteNow"></div>
+      </div>
+
+      <div class="viability-divider"></div>
+
+      <div class="viability-half">
+        <div class="subtitle" id="forecastSubtitle">Forecast month</div>
+        <div class="dot" id="viabilityDotFuture"></div>
+        <div class="vlabel" id="viabilityLabelFuture">Loading&hellip;</div>
+        <div class="vnote" id="viabilityNoteFuture"></div>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <strong>Forecast reliability.</strong> The system is validated only
+      for target dates up to 24 months ahead of the latest observation.
+      Uncertainty intervals widen as you move further into the future
+      &mdash; a 90% interval for month +1 is typically &plusmn;3 DM units,
+      while a 24-month forecast may span &plusmn;15 units. Do not use this
+      tool for long-range climate projections.
+    </div>
+  </section>
+
+  <!-- ============ Leaderboard ============ -->
+  <section class="card">
+    <h3>Model comparison</h3>
+    <p class="explain">
+      All six models were trained and evaluated on the same temporal split
+      (train: 2015&ndash;2021, test: 2023&nbsp;&rarr;&nbsp;). Lower RMSE and
+      higher R&sup2; are better for regression; higher F1 is better for
+      classification. The three non-AI baselines
+      (<em>LinearTrend</em>, <em>SARIMA</em>, <em>Rule</em>) are included
+      so you can see exactly how much the machine-learning models add on
+      top of simpler methods.
+    </p>
+    <table id="lbTable">
+      <thead>
+        <tr><th>Model</th><th>Task</th><th>RMSE</th><th>MAE</th><th>R&sup2;</th><th>F1</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- ============ Trend chart ============ -->
+  <section class="card">
+    <h3>Historical + projected De Martonne aridity index</h3>
+    <p class="explain">
+      The solid olive line shows the eleven years of observed monthly index
+      values at the selected station. Dot colour encodes the aridity zone
+      for that month. The orange dashed line is the model's forward
+      projection for the next 24 months; the shaded band around it is the
+      <strong>90% bootstrap confidence interval</strong>. The band widens
+      with horizon by construction &mdash; an honest representation of
+      forecast uncertainty, not a bug.
+    </p>
+    <div class="chart-container"><canvas id="trendChart"></canvas></div>
+    <div class="legend-row">
+      <span class="sw humid"></span>Humid (&gt;30)
+      <span class="sw subhumid"></span>Sub-humid (20&ndash;30)
+      <span class="sw semiarid"></span>Semi-arid (10&ndash;20)
+      <span class="sw arid"></span>Arid (5&ndash;10)
+      <span class="sw hyperarid"></span>Hyper-arid (&lt;5)
+    </div>
+  </section>
+
+  <!-- ============ SHAP ============ -->
+  <section class="card">
+    <h3>Feature attribution (SHAP)</h3>
+    <p class="explain">
+      SHAP values decompose a single prediction into the contribution of
+      each input feature. Green bars push the predicted index
+      <strong>up</strong> (toward wetter conditions); red bars push it
+      <strong>down</strong> (drier). The values are additive: the sum of
+      the bars plus the model's baseline equals the final prediction. This
+      is how we surface model reasoning instead of treating it as a black
+      box.
+    </p>
+    <div class="chart-container small"><canvas id="shapChart"></canvas></div>
+  </section>
+
+  <!-- ============ Classifier ============ -->
+  <section class="card">
+    <h3>Classifier output &mdash; aridity zone</h3>
+    <p class="explain">
+      A separate model &mdash; a RandomForest classifier &mdash; predicts
+      the aridity zone <em>directly</em>, without first computing a De
+      Martonne number. The bar chart shows its confidence across all five
+      zones. A high single bar means the month is unambiguously in that
+      zone; several comparable bars mean the case is borderline. The green
+      check confirms when both models (regressor and classifier) agree.
+    </p>
+    <div class="row" style="grid-template-columns: 1fr 1.6fr; gap: 28px; align-items: start;">
+      <div>
+        <div class="subtitle">Predicted zone</div>
+        <div class="vlabel" id="clfZone" style="margin-top: 8px;">&mdash;</div>
+        <div class="vnote" id="clfAgreement" style="margin-top: 10px;"></div>
+      </div>
+      <div>
+        <div class="subtitle">Class probabilities</div>
+        <div class="chart-container small" style="height:200px;">
+          <canvas id="clfChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Limitations ============ -->
+  <section class="card limits" id="limitations">
+    <h3>Scope, limitations, and responsible use</h3>
+
+    <h4>Temporal scope</h4>
+    <p>
+      The system is trained on roughly eleven years of monthly station data
+      (2015&ndash;present). Reliable predictive validity has been assessed
+      only for horizons up to <strong>24 months</strong>. The widening
+      prediction intervals reflect this: short horizons (1&ndash;6 months)
+      are operationally useful for seasonal planning, while horizons beyond
+      two years are presented for illustrative purposes and should not
+      inform binding decisions.
+    </p>
+
+    <h4>Spatial scope</h4>
+    <p>
+      Predictions are valid only for the four monitored stations
+      (Ammik, Doures, Ras&nbsp;Baalbeck, Tal&nbsp;Amara). The system makes
+      no claims about unmonitored locations; geographical interpolation
+      would require a much denser sensor network than currently exists in
+      the Bekaa.
+    </p>
+
+    <h4>Statistical significance of trend detection</h4>
+    <p>
+      Mann&ndash;Kendall trend tests across all four stations return
+      <em>p&nbsp;&gt;&nbsp;0.05</em>. The apparent trends (Ammik wetting,
+      the other three drying) are directionally consistent with regional
+      climatology but cannot be claimed as statistically significant from
+      this dataset alone. Formal trend detection would require 20&ndash;30
+      years of continuous observations.
+    </p>
+
+    <h4>Index formulation</h4>
+    <p>
+      The De Martonne aridity index is a first-order agroclimatic
+      indicator combining precipitation and temperature. It does
+      <em>not</em> incorporate wind speed, solar radiation, or actual
+      evapotranspiration. A future iteration of BekaaSense is planned
+      around SPEI once a longer homogeneous temperature record becomes
+      available.
+    </p>
+
+    <h4>Distribution shift under climate change</h4>
+    <p>
+      Climate change is itself a distribution shift: the climate of
+      2015&ndash;2025 may not represent the climate of 2030&nbsp;+. The
+      system mitigates this by widening intervals with horizon,
+      stratifying residuals by year so drift is visible, and disclosing
+      this caveat here. It does not eliminate the risk.
+    </p>
+
+    <h4>Intended use</h4>
+    <p>
+      BekaaSense is a <strong>decision-support tool</strong>. It
+      complements expert agronomic and hydrological judgement rather than
+      replacing it. Outputs should be interpreted alongside on-the-ground
+      knowledge of soil, irrigation infrastructure, market dynamics, and
+      policy context.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <p>
+    BekaaSense &middot; EECE 490/690 Project &middot; Spring 2025&ndash;2026
+    &middot; American University of Beirut &middot; Built on Django + DRF
+    &middot; Photo credit:
+    <a href="http://www.lari.gov.lb/" target="_blank" rel="noopener">lari.gov.lb</a>
+  </p>
+</footer>
+
+<script src="{% static 'dashboard/js/dashboard.js' %}"></script>
+</body>
+</html>

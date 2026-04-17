@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environments
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build artefacts
+*.egg-info/
+build/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Local data (mounted via volumes at runtime)
+data/raw/
+staticfiles/
+
+# Git
+.git/
+.gitignore
