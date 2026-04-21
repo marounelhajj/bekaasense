@@ -262,6 +262,38 @@ def leaderboard(request):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET"])
+def scoring(request):
+    """Return full ML scoring report: per-class precision/recall/F1,
+    extended leaderboard with bias + interval coverage, and model health."""
+    results = {}
+
+    lb_path = METRICS / "leaderboard.json"
+    if lb_path.exists():
+        results["leaderboard"] = json.loads(lb_path.read_text())
+
+    cr_path = METRICS / "classifier_report.json"
+    if cr_path.exists():
+        results["classifier_report"] = json.loads(cr_path.read_text())
+
+    health_path = METRICS / "model_health.json"
+    if health_path.exists():
+        results["model_health"] = json.loads(health_path.read_text())
+
+    shap_path = METRICS / "shap_importance.csv"
+    if shap_path.exists():
+        import pandas as pd
+        shap_df = pd.read_csv(shap_path)
+        results["shap_importance"] = shap_df.head(10).to_dict(orient="records")
+
+    if not results:
+        return Response(
+            {"detail": "No metrics found. Run `make train` first."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return Response(results)
+
+
+@api_view(["GET"])
 def latest_zone(request):
     """Return the classifier's prediction + probabilities for the latest
     observation of a given station. Exposes the AridityZoneClassifier output

@@ -9,5 +9,6 @@ urlpatterns = [
     path("trend/", views.trend, name="trend"),
     path("explain/", views.explain, name="explain"),
     path("leaderboard/", views.leaderboard, name="leaderboard"),
+    path("scoring/", views.scoring, name="scoring"),
     path("latest_zone/", views.latest_zone, name="latest_zone"),
 ]

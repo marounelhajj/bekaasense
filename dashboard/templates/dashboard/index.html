@@ -156,10 +156,49 @@
     </p>
     <table id="lbTable">
       <thead>
-        <tr><th>Model</th><th>Task</th><th>RMSE</th><th>MAE</th><th>R&sup2;</th><th>F1</th></tr>
+        <tr><th>Model</th><th>Task</th><th>RMSE</th><th>MAE</th><th>R&sup2;</th><th>Bias</th><th>Coverage&nbsp;90%</th><th>F1 (weighted)</th></tr>
       </thead>
       <tbody></tbody>
     </table>
+  </section>
+
+  <!-- ============ ML Scoring Metrics ============ -->
+  <section class="card" id="scoringSection">
+    <h3>ML scoring metrics</h3>
+    <p class="explain">
+      Detailed evaluation of both ML models on the held-out test set.
+      The health badge summarises whether each model meets minimum
+      quality thresholds (R&sup2;&nbsp;&ge;&nbsp;0.85 and RMSE&nbsp;&lt;&nbsp;8
+      for regressors; F1&nbsp;weighted&nbsp;&ge;&nbsp;0.85 for the classifier).
+      If a model fails, retraining is recommended.
+    </p>
+
+    <!-- Health badges -->
+    <div id="healthBadges" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;"></div>
+
+    <!-- Per-class classifier metrics table -->
+    <h4 style="margin:18px 0 8px;">Classifier: per-class precision / recall / F1</h4>
+    <p class="explain" style="margin-bottom:10px;">
+      Each row is one aridity zone. <strong>Precision</strong> = fraction of
+      predicted-as-zone rows that truly are that zone. <strong>Recall</strong>
+      = fraction of true zone rows the classifier caught. <strong>F1</strong>
+      = harmonic mean. <strong>Support</strong> = number of test samples in
+      that class.
+    </p>
+    <table id="classifierTable">
+      <thead>
+        <tr><th>Zone / Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Support</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <!-- Confusion matrix -->
+    <h4 style="margin:22px 0 8px;">Confusion matrix (classifier)</h4>
+    <p class="explain" style="margin-bottom:10px;">
+      Rows = true class, Columns = predicted class. Diagonal = correct
+      predictions. Off-diagonal = misclassifications.
+    </p>
+    <div id="confusionMatrix" style="overflow-x:auto;"></div>
   </section>
 
   <!-- ============ Trend chart ============ -->

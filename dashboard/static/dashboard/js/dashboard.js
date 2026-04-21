@@ -122,14 +122,107 @@ async function renderClassifier(station) {
 async function renderLeaderboard() {
   let data;
   try { data = await fetchJSON("/api/leaderboard/"); }
-  catch (e) { $("lbTable").querySelector("tbody").innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;">Run python -m model_engine.train</td></tr>'; return; }
+  catch (e) { $("lbTable").querySelector("tbody").innerHTML = '<tr><td colspan="8" style="text-align:center;color:#6b7280;">Run python -m model_engine.train</td></tr>'; return; }
   const rows = data.leaderboard || [];
   const tbody = $("lbTable").querySelector("tbody"); tbody.innerHTML = "";
   rows.forEach(r => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td><strong>${r.model}</strong></td><td>${r.task}</td><td>${r.rmse !== undefined ? r.rmse.toFixed(3) : "-"}</td><td>${r.mae !== undefined ? r.mae.toFixed(3) : "-"}</td><td>${r.r2 !== undefined ? r.r2.toFixed(3) : "-"}</td><td>${r.f1_weighted !== undefined ? r.f1_weighted.toFixed(3) : "-"}</td>`;
+    const cov = r.interval_coverage_90 !== undefined ? (r.interval_coverage_90 * 100).toFixed(1) + "%" : "-";
+    const covStyle = r.interval_coverage_90 !== undefined && r.interval_coverage_90 < 0.88 ? 'style="color:#f97316;font-weight:600;"' : "";
+    tr.innerHTML = `<td><strong>${r.model}</strong></td><td>${r.task}</td>` +
+      `<td>${r.rmse !== undefined ? r.rmse.toFixed(3) : "-"}</td>` +
+      `<td>${r.mae !== undefined ? r.mae.toFixed(3) : "-"}</td>` +
+      `<td>${r.r2 !== undefined ? r.r2.toFixed(3) : "-"}</td>` +
+      `<td>${r.bias !== undefined ? r.bias.toFixed(3) : "-"}</td>` +
+      `<td ${covStyle}>${cov}</td>` +
+      `<td>${r.f1_weighted !== undefined ? r.f1_weighted.toFixed(3) : "-"}</td>`;
     tbody.appendChild(tr);
   });
+}
+
+async function renderScoringMetrics() {
+  let data;
+  try { data = await fetchJSON("/api/scoring/"); }
+  catch (e) { return; }
+
+  // Health badges
+  const health = data.model_health || {};
+  const badgesEl = $("healthBadges");
+  if (badgesEl) {
+    badgesEl.innerHTML = "";
+    const MODELS = ["RandomForest", "XGBoost", "AridityZoneClassifier"];
+    MODELS.forEach(name => {
+      const h = health[name];
+      if (!h) return;
+      const pass = h.pass;
+      const badge = document.createElement("div");
+      badge.style.cssText = `padding:8px 14px;border-radius:6px;font-size:0.85rem;font-weight:600;background:${pass?"#dcfce7":"#fee2e2"};color:${pass?"#166534":"#991b1b"};border:1px solid ${pass?"#86efac":"#fca5a5"}`;
+      let detail = "";
+      if (h.r2 !== undefined) detail = `R²=${h.r2.toFixed(3)}, RMSE=${h.rmse.toFixed(2)}, Cov=${(h.interval_coverage_90*100).toFixed(1)}%`;
+      else if (h.f1_weighted !== undefined) detail = `F1w=${h.f1_weighted.toFixed(3)}, F1m=${h.f1_macro.toFixed(3)}`;
+      badge.innerHTML = `${pass ? "✓" : "✗"} ${name}<br><span style="font-weight:400;font-size:0.78rem;">${detail}</span>`;
+      badgesEl.appendChild(badge);
+    });
+    if (health.retrain_recommended) {
+      const warn = document.createElement("div");
+      warn.style.cssText = "padding:8px 14px;border-radius:6px;font-size:0.85rem;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;font-weight:600;";
+      warn.textContent = "Retraining recommended — run: make train";
+      badgesEl.appendChild(warn);
+    }
+  }
+
+  // Per-class classifier table
+  const cr = data.classifier_report;
+  const ctbody = $("classifierTable") && $("classifierTable").querySelector("tbody");
+  if (cr && ctbody) {
+    ctbody.innerHTML = "";
+    const SKIP = ["accuracy", "macro avg", "weighted avg"];
+    Object.entries(cr.per_class || {}).forEach(([cls, m]) => {
+      if (SKIP.includes(cls)) return;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><strong>${cls}</strong></td>` +
+        `<td>${m.precision !== undefined ? m.precision.toFixed(3) : "-"}</td>` +
+        `<td>${m.recall !== undefined ? m.recall.toFixed(3) : "-"}</td>` +
+        `<td>${m["f1-score"] !== undefined ? m["f1-score"].toFixed(3) : "-"}</td>` +
+        `<td>${m.support !== undefined ? m.support : "-"}</td>`;
+      ctbody.appendChild(tr);
+    });
+    // Summary rows
+    ["macro avg", "weighted avg"].forEach(key => {
+      const m = cr.per_class[key];
+      if (!m) return;
+      const tr = document.createElement("tr");
+      tr.style.fontStyle = "italic"; tr.style.color = "#6b7280";
+      tr.innerHTML = `<td>${key}</td>` +
+        `<td>${m.precision !== undefined ? m.precision.toFixed(3) : "-"}</td>` +
+        `<td>${m.recall !== undefined ? m.recall.toFixed(3) : "-"}</td>` +
+        `<td>${m["f1-score"] !== undefined ? m["f1-score"].toFixed(3) : "-"}</td>` +
+        `<td>${m.support !== undefined ? m.support : "-"}</td>`;
+      ctbody.appendChild(tr);
+    });
+  }
+
+  // Confusion matrix
+  const cmEl = $("confusionMatrix");
+  if (cr && cmEl && cr.confusion_matrix && cr.labels) {
+    const labels = cr.labels;
+    const matrix = cr.confusion_matrix;
+    let html = '<table style="border-collapse:collapse;font-size:0.82rem;">';
+    html += '<thead><tr><th style="padding:4px 8px;background:#f3f4f6;border:1px solid #e5e7eb;"></th>';
+    labels.forEach(l => { html += `<th style="padding:4px 8px;background:#f3f4f6;border:1px solid #e5e7eb;white-space:nowrap;">Pred: ${l}</th>`; });
+    html += "</tr></thead><tbody>";
+    matrix.forEach((row, i) => {
+      html += `<tr><td style="padding:4px 8px;background:#f3f4f6;border:1px solid #e5e7eb;font-weight:600;white-space:nowrap;">True: ${labels[i]}</td>`;
+      row.forEach((val, j) => {
+        const onDiag = i === j;
+        const bg = onDiag ? "#dcfce7" : (val > 0 ? "#fee2e2" : "#fff");
+        html += `<td style="padding:4px 12px;border:1px solid #e5e7eb;text-align:center;background:${bg};font-weight:${onDiag?"600":"400"}">${val}</td>`;
+      });
+      html += "</tr>";
+    });
+    html += "</tbody></table>";
+    cmEl.innerHTML = html;
+  }
 }
 
 async function refresh() {
@@ -146,5 +239,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("station").addEventListener("change", async () => { await initMonthPicker(); refresh(); });
   $("target_month").addEventListener("change", refresh);
   renderLeaderboard();
+  renderScoringMetrics();
   refresh();
 });

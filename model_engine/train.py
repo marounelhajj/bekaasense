@@ -153,6 +153,21 @@ def run(data_csv: Path | str = DATA_CSV) -> dict:
         "f1_macro": cm["f1_macro"],
     })
 
+    # Save full per-class precision/recall/F1 + confusion matrix
+    classifier_report = {
+        "per_class": {
+            cls: {k: round(v, 4) for k, v in metrics.items()}
+            for cls, metrics in cm["report"].items()
+            if isinstance(metrics, dict)
+        },
+        "f1_weighted": round(cm["f1_weighted"], 4),
+        "f1_macro": round(cm["f1_macro"], 4),
+        "confusion_matrix": cm["confusion_matrix"],
+        "labels": cm["labels"],
+    }
+    with open(METRICS / "classifier_report.json", "w") as f:
+        json.dump(classifier_report, f, indent=2, default=str)
+
     # ---------------- Residual analysis (TM6) ----------------
     test_resid = test.assign(prediction=rf_pred)
     residuals_by_year(test_resid).to_csv(METRICS / "residuals_by_year.csv", index=False)
@@ -164,6 +179,36 @@ def run(data_csv: Path | str = DATA_CSV) -> dict:
         compute_global_importance(rf, Xva, METRICS / "shap_importance.csv")
     except Exception as e:
         log.warning("SHAP failed: %s", e)
+
+    # ---------------- Model health assessment ----------------
+    health = {
+        "RandomForest": {
+            "r2": leaderboard[3]["r2"],
+            "rmse": leaderboard[3]["rmse"],
+            "interval_coverage_90": rf_cov,
+            "pass": leaderboard[3]["r2"] >= 0.85 and leaderboard[3]["rmse"] < 8.0,
+        },
+        "XGBoost": {
+            "r2": leaderboard[4]["r2"],
+            "rmse": leaderboard[4]["rmse"],
+            "interval_coverage_90": xgb_cov,
+            "pass": leaderboard[4]["r2"] >= 0.85 and leaderboard[4]["rmse"] < 8.0,
+        },
+        "AridityZoneClassifier": {
+            "f1_weighted": cm["f1_weighted"],
+            "f1_macro": cm["f1_macro"],
+            "pass": cm["f1_weighted"] >= 0.85,
+        },
+    }
+    all_pass = all(v["pass"] for v in health.values())
+    health["overall_pass"] = all_pass
+    health["retrain_recommended"] = not all_pass
+    with open(METRICS / "model_health.json", "w") as f:
+        json.dump(health, f, indent=2, default=str)
+    if not all_pass:
+        log.warning("One or more models failed quality thresholds — review model_health.json")
+    else:
+        log.info("All models passed quality thresholds.")
 
     # ---------------- Persist ----------------
     log.info("Persisting models -> %s", ARTIFACTS)
