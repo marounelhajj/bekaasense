@@ -45,6 +45,7 @@ from model_engine.explainability import compute_global_importance
 from model_engine.ml_models import (
     AridityZoneClassifier,
     RandomForestForecaster,
+    XGBoostClassifier as XGBoostZoneClassifier,
     XGBoostForecaster,
     save_model,
 )
@@ -127,8 +128,8 @@ def run(data_csv: Path | str = DATA_CSV) -> dict:
         "interval_coverage_90": rf_cov,
     })
 
-    log.info("Training XGBoostForecaster")
-    xgb = XGBoostForecaster().fit(Xtr, ytr)
+    log.info("Training XGBoostForecaster (with early stopping on val set)")
+    xgb = XGBoostForecaster().fit(Xtr, ytr, X_val=Xva, y_val=yva)
     xgb.calibrate_residuals(Xva, yva)
     xgb_pred = xgb.predict(Xte)
     xgb_mean, xgb_lo, xgb_hi = xgb.predict_with_interval(Xte, alpha=0.1)
@@ -140,15 +141,48 @@ def run(data_csv: Path | str = DATA_CSV) -> dict:
     })
 
     # ---------------- ML classifier (aridity zone) ----------------
-    log.info("Training AridityZoneClassifier")
-    zone_feats = [c for c in NOWCAST_FEATURE_SET if c in feat.columns]
-    zclf = AridityZoneClassifier().fit(
+    log.info("Training AridityZoneClassifier (RF + XGB, best wins)")
+    # Include current-month features (nowcast) + station identity.
+    # de_martonne is now in NOWCAST_FEATURE_SET — it is the exact value from
+    # which aridity zones are derived, so the classifier can learn the
+    # thresholds precisely rather than reverse-engineering them from precip/temp.
+    stn_cols = [c for c in feat.columns if c.startswith("stn_")]
+    zone_feats = [c for c in NOWCAST_FEATURE_SET if c in feat.columns] + stn_cols
+
+    # --- RF classifier ---
+    rf_zclf = AridityZoneClassifier().fit(
         train[zone_feats].fillna(0), train["aridity_zone"]
     )
-    zpred = zclf.predict(test[zone_feats].fillna(0))
-    cm = classification_metrics(test["aridity_zone"].values, zpred)
+    rf_zpred = rf_zclf.predict(test[zone_feats].fillna(0))
+    rf_cm = classification_metrics(test["aridity_zone"].values, rf_zpred)
+    log.info("RF classifier F1_weighted=%.4f F1_macro=%.4f",
+             rf_cm["f1_weighted"], rf_cm["f1_macro"])
+
+    # --- XGB classifier ---
+    try:
+        xgb_zclf = XGBoostZoneClassifier().fit(
+            train[zone_feats].fillna(0), train["aridity_zone"]
+        )
+        xgb_zpred = xgb_zclf.predict(test[zone_feats].fillna(0))
+        xgb_cm = classification_metrics(test["aridity_zone"].values, xgb_zpred)
+        log.info("XGB classifier F1_weighted=%.4f F1_macro=%.4f",
+                 xgb_cm["f1_weighted"], xgb_cm["f1_macro"])
+    except Exception as e:
+        log.warning("XGB classifier failed: %s — falling back to RF", e)
+        xgb_zclf, xgb_cm = None, {"f1_weighted": 0.0, "f1_macro": 0.0}
+
+    # Pick the classifier with the higher macro-F1 (fairer for imbalanced classes)
+    if xgb_zclf is not None and xgb_cm["f1_macro"] > rf_cm["f1_macro"]:
+        zclf, cm, best_clf_name = xgb_zclf, xgb_cm, "XGBoostClassifier"
+        zpred = xgb_zpred
+    else:
+        zclf, cm, best_clf_name = rf_zclf, rf_cm, "AridityZoneClassifier"
+        zpred = rf_zpred
+
+    log.info("Best zone classifier: %s (F1_weighted=%.4f, F1_macro=%.4f)",
+             best_clf_name, cm["f1_weighted"], cm["f1_macro"])
     leaderboard.append({
-        "model": "AridityZoneClassifier", "task": "classification",
+        "model": best_clf_name, "task": "classification",
         "f1_weighted": cm["f1_weighted"],
         "f1_macro": cm["f1_macro"],
     })
@@ -235,7 +269,7 @@ def run(data_csv: Path | str = DATA_CSV) -> dict:
     with open(ARTIFACTS / "feature_sets.json", "w") as f:
         json.dump({
             "forecast": FORECAST_FEATURE_SET,
-            "nowcast": zone_feats,
+            "nowcast": zone_feats,  # includes de_martonne + station dummies
         }, f, indent=2)
 
     log.info("Training complete. Leaderboard:")

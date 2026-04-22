@@ -32,6 +32,7 @@ except Exception:  # pragma: no cover
     HAS_XGB = False
 
 try:
+    from imblearn.combine import SMOTETomek  # type: ignore
     from imblearn.over_sampling import SMOTE  # type: ignore
     HAS_SMOTE = True
 except Exception:  # pragma: no cover
@@ -51,8 +52,8 @@ class RandomForestForecaster:
     """
 
     n_estimators: int = 400
-    max_depth: int | None = 12
-    min_samples_leaf: int = 2
+    max_depth: int | None = 10   # was 12; shallower trees reduce variance
+    min_samples_leaf: int = 4    # was 2; larger leaves reduce over-fitting
     random_state: int = 42
     feature_names_: list[str] = field(default_factory=list)
     model_: RandomForestRegressor | None = None
@@ -92,17 +93,29 @@ class RandomForestForecaster:
 
 @dataclass
 class XGBoostForecaster:
-    """Gradient-boosted forecaster. Often marginally wins over RF on this
-    dataset; kept as a second model for ensembling / comparison."""
+    """Gradient-boosted forecaster with early stopping against a validation
+    set to prevent over-fitting on the small Bekaa training set (~330 rows).
 
-    n_estimators: int = 400
-    max_depth: int = 6
+    Without early stopping, XGBoost reaches R²≈0.9999 on train but degrades
+    on val/test. Early stopping on val RMSE caps the ensemble at the point of
+    best generalisation rather than minimum training loss.
+    """
+
+    n_estimators: int = 600   # upper bound; early stopping will trim this
+    max_depth: int = 5        # shallower than before to reduce variance
     learning_rate: float = 0.05
+    early_stopping_rounds: int = 30
+    reg_lambda: float = 2.0   # L2 weight regularization
+    reg_alpha: float = 0.1    # L1 weight regularization
     random_state: int = 42
     feature_names_: list[str] = field(default_factory=list)
     model_: object | None = None
+    _val_X: object | None = None
+    _val_y: object | None = None
 
-    def fit(self, X: pd.DataFrame, y: pd.Series) -> "XGBoostForecaster":
+    def fit(self, X: pd.DataFrame, y: pd.Series,
+            X_val: pd.DataFrame | None = None,
+            y_val: pd.Series | None = None) -> "XGBoostForecaster":
         if not HAS_XGB:
             raise ImportError("xgboost not installed; `pip install xgboost`")
         self.feature_names_ = list(X.columns)
@@ -111,11 +124,18 @@ class XGBoostForecaster:
             max_depth=self.max_depth,
             learning_rate=self.learning_rate,
             subsample=0.85, colsample_bytree=0.85,
+            reg_lambda=self.reg_lambda,
+            reg_alpha=self.reg_alpha,
             objective="reg:squarederror",
             random_state=self.random_state,
             n_jobs=-1, verbosity=0,
+            early_stopping_rounds=self.early_stopping_rounds if X_val is not None else None,
         )
-        self.model_.fit(X.values, y.values)
+        fit_kwargs: dict = {"X": X.values, "y": y.values}
+        if X_val is not None and y_val is not None:
+            fit_kwargs["eval_set"] = [(X_val[self.feature_names_].values, y_val.values)]
+            fit_kwargs["verbose"] = False
+        self.model_.fit(**fit_kwargs)
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
@@ -174,12 +194,15 @@ class AridityZoneClassifier:
 
         X_tr, y_tr = X.values, y.values
         if self.use_smote and HAS_SMOTE:
-            # SMOTE only for classes with > 1 sample
+            # SMOTETomek: oversample minority classes then remove borderline
+            # Tomek link pairs — produces cleaner decision boundaries than
+            # plain SMOTE, which is important for the Semi-arid/Sub-humid edge.
             try:
                 k = min(5, int(pd.Series(y_tr).value_counts().min()) - 1)
                 if k >= 1:
-                    X_tr, y_tr = SMOTE(
-                        k_neighbors=k, random_state=self.random_state
+                    smote = SMOTE(k_neighbors=k, random_state=self.random_state)
+                    X_tr, y_tr = SMOTETomek(
+                        smote=smote, random_state=self.random_state
                     ).fit_resample(X_tr, y_tr)
             except Exception:
                 pass  # fallback: class weights alone
@@ -196,6 +219,73 @@ class AridityZoneClassifier:
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         assert self.model_ is not None
         return self.model_.predict(X[self.feature_names_].values)
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        assert self.model_ is not None
+        return self.model_.predict_proba(X[self.feature_names_].values)
+
+
+@dataclass
+class XGBoostClassifier:
+    """XGBoost multiclass classifier for aridity zone prediction.
+
+    Gradient boosted trees learn the DM threshold boundaries more precisely
+    than an axis-aligned Random Forest, especially when de_martonne is in
+    the feature set (the boundary is a simple step function on that feature).
+    """
+
+    n_estimators: int = 400
+    max_depth: int = 6
+    learning_rate: float = 0.05
+    random_state: int = 42
+    feature_names_: list[str] = field(default_factory=list)
+    classes_: np.ndarray | None = None
+    _label_map_: dict = field(default_factory=dict)
+    _inv_label_map_: dict = field(default_factory=dict)
+    model_: object | None = None
+
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> "XGBoostClassifier":
+        if not HAS_XGB:
+            raise ImportError("xgboost not installed")
+        from sklearn.preprocessing import LabelEncoder
+        self.feature_names_ = list(X.columns)
+        self.classes_ = np.array(sorted(y.unique()))
+        le = LabelEncoder()
+        y_enc = le.fit_transform(y.values)
+        self._label_map_ = {cls: i for i, cls in enumerate(le.classes_)}
+        self._inv_label_map_ = {i: cls for cls, i in self._label_map_.items()}
+
+        X_tr, y_tr = X.values, y_enc
+        if HAS_SMOTE:
+            try:
+                k = min(5, int(pd.Series(y.values).value_counts().min()) - 1)
+                if k >= 1:
+                    smote = SMOTE(k_neighbors=k, random_state=self.random_state)
+                    X_tr, y_tr = SMOTETomek(
+                        smote=smote, random_state=self.random_state
+                    ).fit_resample(X_tr, y_tr)
+            except Exception:
+                pass
+
+        from xgboost import XGBClassifier as _XGBClassifier
+        self.model_ = _XGBClassifier(
+            n_estimators=self.n_estimators,
+            max_depth=self.max_depth,
+            learning_rate=self.learning_rate,
+            subsample=0.85, colsample_bytree=0.85,
+            objective="multi:softprob",
+            num_class=len(self.classes_),
+            random_state=self.random_state,
+            n_jobs=-1, verbosity=0,
+            eval_metric="mlogloss",
+        )
+        self.model_.fit(X_tr, y_tr)
+        return self
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        assert self.model_ is not None
+        enc_preds = self.model_.predict(X[self.feature_names_].values)
+        return np.array([self._inv_label_map_[i] for i in enc_preds])
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         assert self.model_ is not None

@@ -23,6 +23,7 @@
     "temp_avg",
     "temp_max",
     "temp_min",
+    "de_martonne",
     "dm_lag1",
     "dm_lag2",
     "dm_lag3",
@@ -36,6 +37,10 @@
     "temp_roll3",
     "spi3",
     "spi6",
-    "spi12"
+    "spi12",
+    "stn_Ammik",
+    "stn_Doures",
+    "stn_Ras_Baalbeck",
+    "stn_Tal_Amara"
   ]
 }

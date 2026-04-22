@@ -1,19 +1,19 @@
 {
   "RandomForest": {
-    "r2": 0.9383043148545209,
-    "rmse": 5.0110138727680456,
-    "interval_coverage_90": 0.8402777777777778,
+    "r2": 0.9396861036454124,
+    "rmse": 4.954580647556442,
+    "interval_coverage_90": 0.8194444444444444,
     "pass": true
   },
   "XGBoost": {
-    "r2": 0.9252569516746542,
-    "rmse": 5.515483788092374,
-    "interval_coverage_90": 0.9027777777777778,
+    "r2": 0.9277710841839021,
+    "rmse": 5.42192813960997,
+    "interval_coverage_90": 0.875,
     "pass": true
   },
   "AridityZoneClassifier": {
-    "f1_weighted": 0.90969244821799,
-    "f1_macro": 0.87069331081715,
+    "f1_weighted": 0.9791393478450914,
+    "f1_macro": 0.9744953660017792,
     "pass": true
   },
   "overall_pass": true,
