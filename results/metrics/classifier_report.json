@@ -1,85 +1,85 @@
 {
   "per_class": {
     "Arid": {
-      "precision": 0.913,
-      "recall": 1.0,
-      "f1-score": 0.9545,
+      "precision": 0.9524,
+      "recall": 0.9524,
+      "f1-score": 0.9524,
       "support": 21.0
     },
     "Humid": {
-      "precision": 0.9545,
-      "recall": 0.9545,
-      "f1-score": 0.9545,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
       "support": 44.0
     },
     "Hyper-arid": {
-      "precision": 1.0,
+      "precision": 0.9767,
       "recall": 0.9767,
-      "f1-score": 0.9882,
+      "f1-score": 0.9767,
       "support": 43.0
     },
     "Semi-arid": {
-      "precision": 0.8333,
-      "recall": 0.75,
-      "f1-score": 0.7895,
+      "precision": 0.9524,
+      "recall": 1.0,
+      "f1-score": 0.9756,
       "support": 20.0
     },
     "Sub-humid": {
-      "precision": 0.6471,
-      "recall": 0.6875,
-      "f1-score": 0.6667,
+      "precision": 1.0,
+      "recall": 0.9375,
+      "f1-score": 0.9677,
       "support": 16.0
     },
     "macro avg": {
-      "precision": 0.8696,
-      "recall": 0.8738,
-      "f1-score": 0.8707,
+      "precision": 0.9763,
+      "recall": 0.9733,
+      "f1-score": 0.9745,
       "support": 144.0
     },
     "weighted avg": {
-      "precision": 0.9111,
-      "recall": 0.9097,
-      "f1-score": 0.9097,
+      "precision": 0.9795,
+      "recall": 0.9792,
+      "f1-score": 0.9791,
       "support": 144.0
     }
   },
-  "f1_weighted": 0.9097,
-  "f1_macro": 0.8707,
+  "f1_weighted": 0.9791,
+  "f1_macro": 0.9745,
   "confusion_matrix": [
     [
-      21,
+      20,
       0,
-      0,
+      1,
       0,
       0
     ],
     [
       0,
-      42,
+      44,
       0,
-      0,
-      2
-    ],
-    [
-      1,
-      0,
-      42,
       0,
       0
     ],
     [
       1,
       0,
+      42,
       0,
-      15,
-      4
+      0
     ],
     [
       0,
-      2,
       0,
-      3,
-      11
+      0,
+      20,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      15
     ]
   ],
   "labels": [

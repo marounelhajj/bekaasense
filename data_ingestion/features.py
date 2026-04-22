@@ -56,8 +56,12 @@ FORECAST_FEATURE_SET = (
 
 #: Features safe to use for *nowcasting* — classifying the current month
 #: once its precipitation and temperature are observed.
+#: de_martonne is included because it is computed from the current-month
+#: observations (precip_sum, temp_avg) that are already in CURRENT_FEATURES;
+#: the aridity zones are exact thresholds on this value, so exposing it
+#: directly lets the classifier learn the decision boundaries precisely.
 NOWCAST_FEATURE_SET = (
-    SEASONAL_FEATURES + CURRENT_FEATURES + LAG_FEATURES
+    SEASONAL_FEATURES + CURRENT_FEATURES + ["de_martonne"] + LAG_FEATURES
     + ROLLING_FEATURES + CLIMATE_FEATURES
 )
 
