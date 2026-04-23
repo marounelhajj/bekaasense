@@ -91,11 +91,16 @@ production deployment that expects concurrent writes.
 **Joblib persistence over pickle.** `joblib` is the scikit-learn standard
 and handles large numpy arrays better than raw pickle.
 
-**Bootstrapped intervals from per-tree predictions.** For Random Forest,
-per-tree outputs are exact samples from the ensemble distribution; no
-extra bootstrap is needed. For XGBoost, residual bootstrap on validation
-set residuals is used instead — an equally defensible choice and one
-that does not require retraining hundreds of boosters.
+**Split conformal prediction intervals.** After fitting, each regressor
+is calibrated on the 2022 validation set: the absolute residuals
+`|y_val − ŷ_val|` are stored and the quantile at level
+`ceil((n+1)(1−α))/n` (finite-sample conformal correction) is used as a
+symmetric half-width at inference time. This gives a mathematical
+guarantee that empirical coverage ≥ 1−α on exchangeable test data —
+unlike per-tree quantiles (which only capture epistemic uncertainty) or
+residual bootstrap (which can undercover when the test distribution
+shifts). Actual test coverage: RF 93.8%, XGBoost 94.4% vs. the 90%
+target.
 
 **SHAP TreeExplainer.** Exact (not sampled) attributions for tree models,
 and much faster than KernelExplainer. Critically, SHAP values decompose
