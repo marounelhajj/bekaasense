@@ -26,7 +26,7 @@ evidence in this repository.
 |------|-----------|----------|
 | TM1  | Task + data formulation | `data_ingestion/loaders.py` (`CANONICAL_COLS`), `data_ingestion/features.py` (`build_features`) |
 | TM2A | Explicit non-AI baseline | `model_engine/baselines.py` — **three baselines** (`LinearTrendBaseline`, `SarimaBaseline`, `RuleBaseline`), all benchmarked in `model_engine/train.py` |
-| TM3  | ML method choice + substance | `model_engine/ml_models.py` (RF, XGBoost, SMOTE classifier). Choice justified in `docs/ARCHITECTURE.md` §"Model selection" |
+| TM3  | ML method choice + substance | `model_engine/ml_models.py` (RF, XGBoost regressors; XGBoostClassifier with SMOTE-Tomek). Choice justified in `docs/ARCHITECTURE.md` §"Model selection" |
 | TM4  | Preprocessing / features / **leakage** | `data_ingestion/cleaners.py` (impute + outlier flag), `data_ingestion/features.py` (shift-1 rollings), `tests/test_features.py` (`test_assert_no_leakage_fails_when_shuffled`, `test_forecast_features_do_not_include_target_current_value`) |
 | TM5  | Splits, metrics, protocol | `data_ingestion/features.py::temporal_split`, `model_engine/evaluate.py`, `model_engine/train.py` (train 2015–2021, val 2022, test 2023→) |
 | TM6  | Error analysis | `model_engine/evaluate.py::residuals_by_year`, `residuals_by_station`; outputs in `results/metrics/residuals_by_{year,station}.csv` |
@@ -34,7 +34,7 @@ evidence in this repository.
 | RM1  | Explainability | `model_engine/explainability.py` (SHAP TreeExplainer); API `/api/explain/`; dashboard SHAP chart |
 | RM2  | Bias / fairness | Per-station residuals (`residuals_by_station.csv`); imputation flags in `data_ingestion/cleaners.py::add_imputation_flags`; station-scope disclaimer in `docs/LIMITATIONS.md` |
 | RM3  | Privacy / data leakage | `.gitignore` excludes `data/raw/`; no PII in processed schema; feature-leakage guardrail test in `tests/test_features.py` |
-| RM4  | Robustness / distribution shift | Bootstrapped 90 % prediction intervals (`ml_models.py::predict_with_interval`); coverage metric (`evaluate.py::interval_coverage`); intervals widen with horizon by construction (`inference.py::forecast_station`) |
+| RM4  | Robustness / distribution shift | Split conformal prediction intervals with finite-sample correction (`ml_models.py::calibrate_intervals`, `calibrate_residuals`); coverage metric (`evaluate.py::interval_coverage`); actual test coverage RF 93.8%, XGB 94.4% vs 90% target; intervals widen with horizon by construction (`inference.py::forecast_station`); `model_health.json` flags any model failing quality thresholds post-training |
 
 ## 3. Deployment & Engineering (20 %)
 
@@ -71,7 +71,7 @@ evidence in this repository.
 |------|-----------|----------|
 | CI1  | Originality | No published ML work known for monthly desertification forecasting at Bekaa station level — `README.md` + problem formulation §1 |
 | CI2  | Design trade-offs | `docs/ARCHITECTURE.md` §"Design decisions" + model choices documented in `ml_models.py` docstrings |
-| CI3  | Beyond the minimum | **3** baselines (not 1); SHAP explainability; bootstrapped intervals with coverage; crop-viability traffic light; SMOTE + class-weighted classifier for class imbalance; Mann–Kendall honest disclosure |
+| CI3  | Beyond the minimum | **3** baselines (not 1); SHAP explainability; conformal prediction intervals with coverage guarantee; crop-viability traffic light; SMOTE-Tomek + class-weighted XGBoostClassifier (RF and XGB both trained, best kept); Mann–Kendall honest disclosure; decision guide + scientific conclusions on dashboard; model health check system |
 | CI4  | Purposeful polish | Non-root Docker user; multi-stage image; healthcheck; CORS config; whitenoise static serving; env-driven settings; full test suite with leakage guardrail |
 
 ## 7. Bonus (+3 max)

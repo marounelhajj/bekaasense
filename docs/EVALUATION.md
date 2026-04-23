@@ -11,9 +11,16 @@ Strictly temporal:
 | Test        | 2023-01 → present        | Final leaderboard numbers         |
 
 No random shuffling, no k-fold, no cross-station holdout — the system
-must forecast *forward in time*, so the split must mirror that. The
-`assert_no_leakage` guardrail in `data_ingestion.features` fails loudly
-if training ever contains a date ≥ earliest test date.
+must forecast *forward in time*, so the evaluation protocol must mirror
+that. Standard k-fold cross-validation would shuffle the time axis,
+creating look-ahead bias (a model trained on 2024 data predicting 2022
+outcomes is not a valid proxy for real-world deployment). Walk-forward
+or expanding-window CV would be theoretically correct but requires
+≥ 5 years of test data to be statistically meaningful; with only
+~3 test years, a single clean temporal split is more honest than a
+noisy rolling estimate. The `assert_no_leakage` guardrail in
+`data_ingestion.features` fails loudly if training ever contains a
+date ≥ earliest test date.
 
 ## Metrics
 
