@@ -10,5 +10,6 @@ urlpatterns = [
     path("explain/", views.explain, name="explain"),
     path("leaderboard/", views.leaderboard, name="leaderboard"),
     path("scoring/", views.scoring, name="scoring"),
+    path("test_predictions/", views.test_predictions, name="test_predictions"),
     path("latest_zone/", views.latest_zone, name="latest_zone"),
 ]

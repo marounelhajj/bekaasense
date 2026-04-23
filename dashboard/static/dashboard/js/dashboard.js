@@ -1,8 +1,15 @@
-﻿/* BekaaSense dashboard - FIXED v3 */
+﻿/* BekaaSense dashboard */
 const $ = (id) => document.getElementById(id);
-let trendChart = null;
-let shapChart = null;
-let clfChart = null;
+let trendChart = null, shapChart = null, clfChart = null;
+let rmseChart = null, r2Chart = null, scatterChart = null;
+
+function zoneFromDM(dm) {
+  if (dm < 5)  return "Hyper-arid";
+  if (dm < 10) return "Arid";
+  if (dm < 20) return "Semi-arid";
+  if (dm < 30) return "Sub-humid";
+  return "Humid";
+}
 const ZONE_COLOR = {"Humid":"#2563eb","Sub-humid":"#22c55e","Semi-arid":"#eab308","Arid":"#f97316","Hyper-arid":"#dc2626"};
 const MAX_HORIZON_MONTHS = 24;
 
@@ -225,6 +232,84 @@ async function renderScoringMetrics() {
   }
 }
 
+async function renderComparisonCharts() {
+  let data;
+  try { data = await fetchJSON("/api/leaderboard/"); } catch(e) { return; }
+  const lb = data.leaderboard || [];
+  const reg = lb.filter(r => r.rmse !== undefined);
+  const isBaseline = m => ["LinearTrend","SARIMA"].includes(m);
+  const labels = reg.map(r => r.model);
+  const rmseVals = reg.map(r => parseFloat(r.rmse.toFixed(2)));
+  const r2Vals   = reg.map(r => parseFloat(r.r2.toFixed(3)));
+  const bgColors  = reg.map(r => isBaseline(r.model) ? "rgba(148,163,184,0.75)" : "rgba(107,142,35,0.82)");
+  const brdColors = reg.map(r => isBaseline(r.model) ? "#64748b" : "#4a6e14");
+
+  const axisStyle = { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { font: { size: 12 } } };
+  const noLegend = { legend: { display: false } };
+
+  if (rmseChart) rmseChart.destroy();
+  rmseChart = new Chart($("rmseChart").getContext("2d"), {
+    type: "bar",
+    data: { labels, datasets: [{ data: rmseVals, backgroundColor: bgColors, borderColor: brdColors, borderWidth: 1.5, borderRadius: 3 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { ...noLegend, tooltip: { callbacks: { label: c => ` RMSE = ${c.parsed.x.toFixed(2)}` } } },
+      scales: { x: { ...axisStyle, title: { display: true, text: "RMSE (De Martonne units)", font: { size: 11 } }, beginAtZero: true },
+                y: { grid: { display: false }, ticks: { font: { size: 12 } } } } }
+  });
+
+  if (r2Chart) r2Chart.destroy();
+  r2Chart = new Chart($("r2Chart").getContext("2d"), {
+    type: "bar",
+    data: { labels, datasets: [{ data: r2Vals, backgroundColor: bgColors, borderColor: brdColors, borderWidth: 1.5, borderRadius: 3 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { ...noLegend, tooltip: { callbacks: { label: c => ` R² = ${c.parsed.x.toFixed(3)}` } } },
+      scales: { x: { ...axisStyle, title: { display: true, text: "R² (1.0 = perfect)", font: { size: 11 } }, min: -0.15, max: 1.0 },
+                y: { grid: { display: false }, ticks: { font: { size: 12 } } } } }
+  });
+}
+
+async function renderScatterPlot() {
+  let data;
+  try { data = await fetchJSON("/api/test_predictions/"); } catch(e) { return; }
+  const preds = data.predictions || [];
+  const ZONE_HEX = { "Humid":"#2563eb","Sub-humid":"#22c55e","Semi-arid":"#eab308","Arid":"#f97316","Hyper-arid":"#dc2626" };
+
+  const pts = preds.map(p => ({
+    x: parseFloat(p.de_martonne.toFixed(2)),
+    y: parseFloat(p.pred_rf.toFixed(2)),
+    zone: zoneFromDM(p.de_martonne),
+    station: p.station, year: p.year, month: p.month
+  }));
+  const maxV = Math.ceil(Math.max(...pts.map(p => Math.max(p.x, p.y))) + 2);
+
+  if (scatterChart) scatterChart.destroy();
+  scatterChart = new Chart($("scatterChart").getContext("2d"), {
+    type: "scatter",
+    data: { datasets: [
+      { label: "Station-month (RF)", data: pts,
+        backgroundColor: pts.map(p => (ZONE_HEX[p.zone] || "#6b7280") + "bb"),
+        borderColor:     pts.map(p => ZONE_HEX[p.zone] || "#6b7280"),
+        borderWidth: 1, pointRadius: 5, pointHoverRadius: 8 },
+      { label: "Perfect forecast (predicted = actual)",
+        data: [{x:0,y:0},{x:maxV,y:maxV}], type:"line",
+        borderColor:"#dc2626", borderDash:[6,4], borderWidth:2, pointRadius:0, fill:false }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { title: { display:true, text:"Actual De Martonne Index" }, beginAtZero:true, grid:{ color:"rgba(0,0,0,0.05)" } },
+        y: { title: { display:true, text:"Predicted De Martonne (Random Forest)" }, beginAtZero:true, grid:{ color:"rgba(0,0,0,0.05)" } }
+      },
+      plugins: { legend: { position:"bottom" },
+        tooltip: { callbacks: { label: c => {
+          const p = c.raw;
+          if (!p.station) return "Perfect prediction line";
+          return `${p.station}  ${p.year}-${String(p.month).padStart(2,"0")}  |  Zone: ${p.zone}  |  Actual ${c.parsed.x.toFixed(2)}  Pred ${c.parsed.y.toFixed(2)}`;
+        }}}
+      }
+    }
+  });
+}
+
 async function refresh() {
   const station = $("station").value;
   const tmEl = $("target_month");
@@ -240,5 +325,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("target_month").addEventListener("change", refresh);
   renderLeaderboard();
   renderScoringMetrics();
+  renderComparisonCharts();
+  renderScatterPlot();
   refresh();
 });

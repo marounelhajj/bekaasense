@@ -262,6 +262,17 @@ def leaderboard(request):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET"])
+def test_predictions(request):
+    """Serve the held-out test set predictions for scatter / comparison plots."""
+    p = METRICS / "test_predictions.csv"
+    if not p.exists():
+        return Response({"detail": "No test predictions. Run `make train`."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    df = pd.read_csv(p)
+    cols = [c for c in ["station", "year", "month", "de_martonne", "pred_rf", "pred_xgb"] if c in df.columns]
+    return Response({"predictions": df[cols].round(4).to_dict(orient="records")})
+
+
+@api_view(["GET"])
 def scoring(request):
     """Return full ML scoring report: per-class precision/recall/F1,
     extended leaderboard with bias + interval coverage, and model health."""
