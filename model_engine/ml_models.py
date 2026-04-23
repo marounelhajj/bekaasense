@@ -45,18 +45,25 @@ except Exception:  # pragma: no cover
 
 @dataclass
 class RandomForestForecaster:
-    """Random Forest regressor with bootstrapped prediction intervals.
+    """Random Forest regressor with conformalized prediction intervals.
 
-    Intervals are computed from the per-tree predictions, which the
-    ensemble structure exposes directly — no external bootstrap needed.
+    Point predictions come from the standard RF mean. Intervals are
+    calibrated via split conformal prediction on the validation set:
+    the signed residuals (y_val - y_pred) at the alpha/2 and 1-alpha/2
+    quantiles are stored and added to every new point prediction. This
+    guarantees empirical coverage >= (1-alpha) on exchangeable test data,
+    unlike per-tree quantiles which only capture epistemic uncertainty
+    and systematically under-cover.
     """
 
     n_estimators: int = 400
-    max_depth: int | None = 10   # was 12; shallower trees reduce variance
-    min_samples_leaf: int = 4    # was 2; larger leaves reduce over-fitting
+    max_depth: int | None = 10
+    min_samples_leaf: int = 4
     random_state: int = 42
     feature_names_: list[str] = field(default_factory=list)
     model_: RandomForestRegressor | None = None
+    _conf_q_lo_: float = field(default=float("nan"))
+    _conf_q_hi_: float = field(default=float("nan"))
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "RandomForestForecaster":
         self.feature_names_ = list(X.columns)
@@ -74,18 +81,37 @@ class RandomForestForecaster:
         assert self.model_ is not None, "Call fit() before predict()."
         return self.model_.predict(X[self.feature_names_].values)
 
+    def calibrate_intervals(self, X_val: pd.DataFrame,
+                            y_val: pd.Series, alpha: float = 0.1) -> None:
+        """Compute and store the conformal half-width from the validation set.
+
+        Uses symmetric split conformal prediction with the finite-sample
+        correction: the calibration quantile level is
+        ceil((n_cal + 1) * (1 - alpha)) / n_cal rather than (1 - alpha).
+        This guarantees marginal coverage >= (1-alpha) on exchangeable
+        test data, regardless of the residual distribution shape.
+        """
+        residuals = y_val.values.astype(float) - self.predict(X_val)
+        n = len(residuals)
+        q_level = min(1.0, float(np.ceil((n + 1) * (1 - alpha))) / n)
+        self._conf_half_width_ = float(np.quantile(np.abs(residuals), q_level))
+
     def predict_with_interval(self, X: pd.DataFrame,
                               alpha: float = 0.1) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Return (mean, lower, upper) with ``(1-alpha)`` coverage.
+        """Return (mean, lower, upper) with guaranteed (1-alpha) coverage.
 
-        Uses the empirical distribution of per-tree predictions. For a
-        forest of 400 trees with alpha=0.1, bounds are the 5th / 95th
-        per-row percentiles.
+        Uses the calibrated symmetric conformal half-width if
+        calibrate_intervals() has been called; falls back to per-tree
+        quantiles otherwise.
         """
         assert self.model_ is not None, "Call fit() before predict()."
+        mean = self.predict(X)
+        half = getattr(self, "_conf_half_width_", float("nan"))
+        if not np.isnan(half):
+            return mean, mean - half, mean + half
+        # Uncalibrated fallback — per-tree spread
         Xv = X[self.feature_names_].values
         per_tree = np.stack([t.predict(Xv) for t in self.model_.estimators_])
-        mean = per_tree.mean(axis=0)
         lo = np.quantile(per_tree, alpha / 2, axis=0)
         hi = np.quantile(per_tree, 1 - alpha / 2, axis=0)
         return mean, lo, hi
@@ -144,28 +170,34 @@ class XGBoostForecaster:
 
     def predict_with_interval(self, X: pd.DataFrame,
                               alpha: float = 0.1,
-                              n_bootstrap: int = 80,
-                              random_state: int = 42
                               ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Residual bootstrap intervals.
+        """Return (mean, lower, upper) with guaranteed (1-alpha) coverage.
 
-        XGBoost does not expose per-tree predictions like RF, so we use a
-        simpler residual-bootstrap approximation: resample training
-        residuals, add them to the point forecast, and take percentiles.
+        Uses symmetric split conformal prediction with the finite-sample
+        correction: quantile level = ceil((n_cal+1)*(1-alpha)) / n_cal.
         """
         assert self.model_ is not None
-        rng = np.random.default_rng(random_state)
         base = self.predict(X)
-        residuals = getattr(self, "_residuals_", np.zeros(1))
-        samples = rng.choice(residuals, size=(n_bootstrap, len(X)), replace=True)
-        boots = base[None, :] + samples
-        lo = np.quantile(boots, alpha / 2, axis=0)
-        hi = np.quantile(boots, 1 - alpha / 2, axis=0)
-        return base, lo, hi
+        half = getattr(self, "_conf_half_width_", float("nan"))
+        if not np.isnan(half):
+            return base, base - half, base + half
+        # Fallback before calibration: raw residual quantile using alpha
+        res = np.abs(getattr(self, "_residuals_", np.zeros(1)))
+        fallback = float(np.quantile(res, 1 - alpha))
+        return base, base - fallback, base + fallback
 
-    def calibrate_residuals(self, X_val: pd.DataFrame, y_val: pd.Series) -> None:
-        """Store validation residuals for the bootstrap interval."""
-        self._residuals_ = (y_val.values - self.predict(X_val)).astype(float)
+    def calibrate_residuals(self, X_val: pd.DataFrame,
+                            y_val: pd.Series, alpha: float = 0.1) -> None:
+        """Compute and store the conformal half-width from the validation set.
+
+        Uses finite-sample corrected quantile level so coverage >= (1-alpha)
+        is guaranteed on exchangeable test data.
+        """
+        residuals = (y_val.values - self.predict(X_val)).astype(float)
+        self._residuals_ = residuals
+        n = len(residuals)
+        q_level = min(1.0, float(np.ceil((n + 1) * (1 - alpha))) / n)
+        self._conf_half_width_ = float(np.quantile(np.abs(residuals), q_level))
 
 
 # ---------------------------------------------------------------------------

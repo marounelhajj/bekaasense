@@ -23,11 +23,11 @@
   {
     "model": "RandomForest",
     "task": "regression",
-    "rmse": 4.954580647556442,
-    "mae": 3.1667481853299884,
+    "rmse": 4.954580647556443,
+    "mae": 3.166748185329989,
     "r2": 0.9396861036454124,
-    "bias": 0.9176433317483357,
-    "interval_coverage_90": 0.8194444444444444
+    "bias": 0.9176433317483355,
+    "interval_coverage_90": 0.9375
   },
   {
     "model": "XGBoost",
@@ -36,7 +36,7 @@
     "mae": 3.999978591183898,
     "r2": 0.9277710841839021,
     "bias": 1.1218217760430291,
-    "interval_coverage_90": 0.875
+    "interval_coverage_90": 0.9444444444444444
   },
   {
     "model": "XGBoostClassifier",
