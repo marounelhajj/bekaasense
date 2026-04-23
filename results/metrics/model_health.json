@@ -1,14 +1,14 @@
 {
   "RandomForest": {
     "r2": 0.9396861036454124,
-    "rmse": 4.954580647556442,
-    "interval_coverage_90": 0.8194444444444444,
+    "rmse": 4.954580647556443,
+    "interval_coverage_90": 0.9375,
     "pass": true
   },
   "XGBoost": {
     "r2": 0.9277710841839021,
     "rmse": 5.42192813960997,
-    "interval_coverage_90": 0.875,
+    "interval_coverage_90": 0.9444444444444444,
     "pass": true
   },
   "AridityZoneClassifier": {

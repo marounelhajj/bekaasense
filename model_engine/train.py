@@ -119,6 +119,7 @@ def run(data_csv: Path | str = DATA_CSV) -> dict:
     # ---------------- ML regressors ----------------
     log.info("Training RandomForestForecaster")
     rf = RandomForestForecaster().fit(Xtr, ytr)
+    rf.calibrate_intervals(Xva, yva, alpha=0.1)
     rf_pred = rf.predict(Xte)
     rf_mean, rf_lo, rf_hi = rf.predict_with_interval(Xte, alpha=0.1)
     rf_cov = interval_coverage(yte.values, rf_lo, rf_hi)
