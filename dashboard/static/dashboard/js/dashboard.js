@@ -25,7 +25,10 @@ function fmtYM(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
 async function initMonthPicker() {
   const stations = await fetchJSON("/api/stations/");
-  const s = (stations.stations || [])[0];
+  const selectedStation = $("station") ? $("station").value : null;
+  const s = selectedStation
+    ? (stations.stations || []).find(st => st.station === selectedStation) || (stations.stations || [])[0]
+    : (stations.stations || [])[0];
   if (!s) return null;
   const addMonths = (y, m, delta) => { const t = (y * 12 + (m - 1)) + delta; return { year: Math.floor(t / 12), month: (t % 12) + 1 }; };
   const minPick = addMonths(s.latest_year, s.latest_month, 1);
@@ -325,7 +328,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("run").addEventListener("click", refresh);
   // Station change only updates the month picker constraints — refresh requires the Update button
   $("station").addEventListener("change", async () => { await initMonthPicker(); });
-  $("target_month").addEventListener("change", refresh);
   renderLeaderboard();
   renderScoringMetrics();
   renderComparisonCharts();
