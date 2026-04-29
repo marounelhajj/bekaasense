@@ -72,9 +72,11 @@ async function renderViability(station, targetYM) {
   const row = (stations.stations || []).find(s => s.station === station);
   if (row) {
     const v = row.crop_viability;
+    const latestDate = `${row.latest_year}-${String(row.latest_month).padStart(2,"0")}`;
+    $("latestObsSubtitle").textContent = `Latest Station Data (${latestDate})`;
     $("viabilityDotNow").className = "dot " + v.status;
     $("viabilityLabelNow").textContent = `${v.label} - DM = ${row.latest_de_martonne.toFixed(2)}`;
-    $("viabilityNoteNow").textContent = `${v.note} Latest observation: ${row.latest_year}-${String(row.latest_month).padStart(2,"0")} (${row.current_zone}).`;
+    $("viabilityNoteNow").textContent = `${v.note} Zone: ${row.current_zone}.`;
   }
   if (!targetYM || !row) return;
   const h = monthsBetween(row.latest_year, row.latest_month, targetYM.year, targetYM.month);
@@ -321,7 +323,8 @@ async function refresh() {
 document.addEventListener("DOMContentLoaded", async () => {
   await initMonthPicker();
   $("run").addEventListener("click", refresh);
-  $("station").addEventListener("change", async () => { await initMonthPicker(); refresh(); });
+  // Station change only updates the month picker constraints — refresh requires the Update button
+  $("station").addEventListener("change", async () => { await initMonthPicker(); });
   $("target_month").addEventListener("change", refresh);
   renderLeaderboard();
   renderScoringMetrics();
