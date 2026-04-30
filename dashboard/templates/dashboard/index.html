@@ -528,6 +528,32 @@
     </div>
   </section>
 
+  <!-- ============ Forecast Zone Classifier ============ -->
+  <section class="card" id="fclfSection" style="display:none;">
+    <h3>Forecast zone classifier &mdash; <span id="fclfTitle"></span></h3>
+    <p class="explain">
+      Zone probabilities for your selected forecast month are derived from the regression
+      model&rsquo;s predicted De Martonne value and its 90% prediction interval. The interval is
+      treated as a normal distribution to estimate the probability of the station falling
+      in each of the five aridity zones at that future date.
+      A tall single bar means the forecast is unambiguous; several similar bars mean the
+      outcome is genuinely uncertain near a zone boundary.
+    </p>
+    <div class="row" style="grid-template-columns: 1fr 1.6fr; gap: 28px; align-items: start;">
+      <div>
+        <div class="subtitle">Most likely zone</div>
+        <div class="vlabel" id="fclfZone" style="margin-top: 8px;">&mdash;</div>
+        <div class="vnote" id="fclfNote" style="margin-top: 10px;"></div>
+      </div>
+      <div>
+        <div class="subtitle">Zone probability distribution</div>
+        <div class="chart-container small" style="height:200px;">
+          <canvas id="fclfChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ Limitations ============ -->
   <section class="card limits" id="limitations">
     <h3>Scope, limitations, and responsible use</h3>

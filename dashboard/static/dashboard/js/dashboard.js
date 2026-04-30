@@ -1,6 +1,6 @@
 ﻿/* BekaaSense dashboard */
 const $ = (id) => document.getElementById(id);
-let trendChart = null, shapChart = null, clfChart = null;
+let trendChart = null, shapChart = null, clfChart = null, fclfChart = null;
 let rmseChart = null, r2Chart = null, scatterChart = null;
 
 function zoneFromDM(dm) {
@@ -94,6 +94,7 @@ async function renderViability(station, targetYM) {
     $("viabilityDotFuture").className = "dot " + v.status;
     $("viabilityLabelFuture").textContent = `${v.label} - DM = ${t.de_martonne_pred.toFixed(2)}`;
     $("viabilityNoteFuture").textContent = `${v.note} Projected zone: ${t.aridity_zone}. 90% interval: [${t.lower.toFixed(1)}, ${t.upper.toFixed(1)}].`;
+    renderForecastClassifier(t.de_martonne_pred, t.lower, t.upper, targetYM);
   } catch (e) { console.warn(e); }
 }
 
@@ -109,6 +110,54 @@ async function renderSHAP(station) {
     options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
       scales: { x: { title: { display: true, text: "Contribution to predicted index" } } },
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => { const x = f[c.dataIndex]; return `value=${x.value.toFixed(3)}  shap=${x.shap.toFixed(3)}`; } } } } }
+  });
+}
+
+function _normCDF(x) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989423 * Math.exp(-x * x / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779 + t * (-1.8212560 + t * 1.3302744))));
+  return x > 0 ? 1 - p : p;
+}
+
+function zoneProbs(dm, lower, upper) {
+  const sigma = Math.max((upper - lower) / 3.29, 0.01);
+  const thresholds = [-Infinity, 5, 10, 20, 30, Infinity];
+  const zones = ["Hyper-arid", "Arid", "Semi-arid", "Sub-humid", "Humid"];
+  return zones.map((zone, i) => ({
+    zone,
+    probability: _normCDF((thresholds[i + 1] - dm) / sigma) - _normCDF((thresholds[i] - dm) / sigma)
+  }));
+}
+
+function renderForecastClassifier(dm, lower, upper, targetYM) {
+  const section = $("fclfSection");
+  if (!section) return;
+  section.style.display = "";
+
+  const label = `${targetYM.year}-${String(targetYM.month).padStart(2, "0")}`;
+  $("fclfTitle").textContent = label;
+
+  const probs = zoneProbs(dm, lower, upper);
+  const best = probs.reduce((a, b) => a.probability > b.probability ? a : b);
+  $("fclfZone").textContent = best.zone;
+  $("fclfZone").style.color = ZONE_COLOR[best.zone] || "#374151";
+  $("fclfNote").textContent =
+    `Predicted DM = ${dm.toFixed(2)}  ·  90% interval [${lower.toFixed(1)}, ${upper.toFixed(1)}]  ·  ${(best.probability * 100).toFixed(1)}% confidence in ${best.zone}`;
+
+  const labels = probs.map(p => p.zone);
+  const values = probs.map(p => p.probability);
+  const colors = labels.map(z => ZONE_COLOR[z] || "#6b7280");
+
+  if (fclfChart) fclfChart.destroy();
+  fclfChart = new Chart($("fclfChart").getContext("2d"), {
+    type: "bar",
+    data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      scales: { x: { min: 0, max: 1, title: { display: true, text: "Probability" } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `p = ${c.parsed.x.toFixed(3)}` } } }
+    }
   });
 }
 
