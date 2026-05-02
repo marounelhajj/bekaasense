@@ -63,9 +63,10 @@ LARI, FAO Lebanon, and farm cooperatives.
 2. [Methodology](#2-methodology)
 3. [Results](#3-results)
 4. [Conclusions](#4-conclusions)
-5. [Quick Start](#5-quick-start)
-6. [API Reference](#6-api-reference)
-7. [System Capabilities](#7-system-capabilities)
+5. [Honest Limitations](#5-honest-limitations)
+6. [Quick Start](#6-quick-start)
+7. [API Reference](#7-api-reference)
+8. [System Capabilities](#8-system-capabilities)
 
 ---
 
@@ -293,14 +294,7 @@ Before implementing conformal prediction: RF coverage = 81.9%, XGB = 87.5% — b
 
 ### Limitations
 
-- **Temporal scope:** 11 years limits long-horizon reliability. Intervals widen with horizon by design.
-- **Spatial scope:** 4 stations; no claims for unmonitored locations.
-- **Index simplicity:** De Martonne uses only precipitation and temperature — no wind, solar
-  radiation, or actual evapotranspiration. SPEI would be a more complete indicator.
-- **Distribution shift:** The climate of 2015–2025 may not represent 2030+. The system mitigates
-  this through horizon-widening intervals and year-stratified residual monitoring.
-- **Trend significance:** Mann–Kendall tests return p > 0.05 on all four stations. Directional
-  trends are consistent with regional climatology but not yet statistically significant at 11 years.
+See [Section 5 — Honest Limitations](#5-honest-limitations) for a full discussion.
 
 ### Future Work
 
@@ -314,7 +308,47 @@ Before implementing conformal prediction: RF coverage = 81.9%, XGB = 87.5% — b
 
 ---
 
-## 5. Quick Start
+## 5. Honest Limitations
+
+This section documents every known limitation of the system. These are not excuses — they are facts that any user making a real decision should be aware of.
+
+### Data Limitations
+
+**Small dataset.** The system is trained on approximately 528 station-months across 4 stations and 11 years. This is a small dataset by ML standards. Complex climate patterns cannot be reliably learned from this volume of data. The R² ceiling of ~0.94 is almost certainly the information limit of the dataset, not a modelling limit — adding more powerful models would not meaningfully improve performance without more data.
+
+**Single source.** All data comes from LARI. If LARI sensors have systematic calibration errors or biases, the models inherit them. There is no independent validation dataset from a second source.
+
+**Sparse station network.** Four stations cover an entire valley. The spatial resolution is coarse. Predictions are valid only at the exact location of each station. A farm 10 km from the nearest station may have materially different conditions that this system cannot detect or forecast.
+
+**Manual data ingestion.** LARI has no public API. Data is uploaded manually. The system does not update automatically when new station readings become available. In production, this would require a scheduled ingestion pipeline that does not currently exist.
+
+### Model Limitations
+
+**Trend significance.** Mann–Kendall trend tests across all four stations return p > 0.05. The apparent trends in the data — Ammik wetting slightly, the other three drying — are directionally consistent with regional Eastern Mediterranean climatology, but are **not statistically significant** at conventional levels given only 11 years. The system should not be used to make claims about long-term climate trends.
+
+**Long-horizon reliability.** Prediction intervals at 18–24 months are very wide (typically ±12–15 DM units). At these horizons the interval often spans multiple aridity zones, making the zone forecast effectively uninformative. Operationally useful forecasts are those at 1–6 months. The 24-month maximum is presented for completeness, not as an operational recommendation.
+
+**Index simplicity.** De Martonne uses only two variables: monthly precipitation and mean temperature. It ignores wind speed, solar radiation, relative humidity, and actual evapotranspiration. The SPEI (Standardized Precipitation-Evapotranspiration Index) is a more physically complete aridity indicator, but it requires longer homogeneous records than the current dataset provides.
+
+**Distribution shift.** The models are trained on 2015–2025 climate. If climate conditions in 2030+ fall outside the range seen during training, model errors will increase. The widening prediction intervals with horizon provide a partial mitigation, but they do not correct for structural shifts in the climate regime.
+
+**No walk-forward cross-validation.** With only 11 years of data, rolling cross-validation windows would each be too small (under 100 rows) to train reliable models, making the CV estimates themselves unreliable. A single temporal split (train 2015–2021, val 2022, test 2023+) is the most honest choice given the data size, but it means performance estimates are based on a single test window rather than multiple independent windows.
+
+### What the System Cannot Do
+
+| Capability | Status | Why |
+|---|---|---|
+| Real-time data ingestion | Not implemented | LARI has no public API |
+| Spatial interpolation between stations | Not implemented | Would require a denser sensor network and geostatistical methods |
+| Day-level or week-level forecasting | Not implemented | Data is monthly-aggregate only |
+| Forecasts beyond 24 months | Not supported | Interval too wide to be informative; outside validated range |
+| Claims about climate trends | Not supported | Mann–Kendall p > 0.05 on all stations |
+| Generalization to stations outside the 4 monitored | Not supported | Model has no spatial generalization |
+| SPEI or PET-based aridity | Not implemented | Insufficient data for homogeneous long-record estimation |
+
+---
+
+## 6. Quick Start
 
 ### Docker (recommended)
 ```bash
@@ -342,7 +376,7 @@ make install && make data && make train && make test && make serve
 
 ---
 
-## 6. API Reference
+## 7. API Reference
 
 Base URL: `https://bekaasense-fqfdedgmdjcvh4g4.francecentral-01.azurewebsites.net`
 
@@ -367,7 +401,7 @@ curl -X POST https://bekaasense-fqfdedgmdjcvh4g4.francecentral-01.azurewebsites.
 
 ---
 
-## 7. System Capabilities
+## 8. System Capabilities
 
 ### What is implemented
 
