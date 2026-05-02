@@ -72,6 +72,74 @@ main {
 }
 @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
 
+/* ===== Metrics Strip ===== */
+.metrics-strip { padding: 28px 32px; }
+.metrics-title {
+  font-size: 0.8rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.07em;
+  margin-bottom: 20px;
+}
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+.kpi-box {
+  text-align: center;
+  padding: 22px 16px;
+  background: var(--soft-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.kpi-val {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: var(--olive-dark);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.kpi-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 5px;
+}
+.kpi-sub { font-size: 0.76rem; color: var(--muted); line-height: 1.4; }
+
+/* ===== How It Works Pipeline ===== */
+.pipeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.pipe-step {
+  flex: 1;
+  min-width: 160px;
+  background: var(--soft-bg);
+  border-radius: 12px;
+  padding: 20px 16px;
+  border: 1px solid var(--border);
+}
+.pipe-icon { font-size: 1.8rem; margin-bottom: 10px; }
+.pipe-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--olive-dark);
+  margin-bottom: 8px;
+}
+.pipe-desc { font-size: 0.81rem; color: var(--muted); line-height: 1.5; }
+.pipe-arrow {
+  font-size: 1.6rem;
+  color: var(--terra);
+  align-self: center;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+@media (max-width: 900px) { .pipe-arrow { display: none; } }
+
 .card {
   background: var(--paper);
   border-radius: 10px;

@@ -80,6 +80,66 @@
     </figure>
   </section>
 
+  <!-- ============ Results at a Glance ============ -->
+  <section class="card metrics-strip">
+    <div class="metrics-title">Results at a glance &mdash; held-out test set (2023&ndash;present, 144 samples never seen during training)</div>
+    <div class="kpi-row">
+      <div class="kpi-box">
+        <div class="kpi-val">0.940</div>
+        <div class="kpi-label">R² &mdash; Random Forest</div>
+        <div class="kpi-sub">94% of variance explained on unseen data</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">&minus;39%</div>
+        <div class="kpi-label">RMSE vs best baseline</div>
+        <div class="kpi-sub">4.95 vs 8.15 DM units (SARIMA)</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">0.979</div>
+        <div class="kpi-label">F1 &mdash; Zone Classifier</div>
+        <div class="kpi-sub">140 / 144 correct &middot; 5-class problem</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">93.8%</div>
+        <div class="kpi-label">Interval Coverage</div>
+        <div class="kpi-sub">Target &ge;90% &middot; conformal guarantee met</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ How It Works ============ -->
+  <section class="card">
+    <h3>How it works</h3>
+    <p class="explain">
+      Four stages transform raw weather station readings into actionable aridity forecasts.
+    </p>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-icon">&#9312;</div>
+        <div class="pipe-title">Raw Station Data</div>
+        <div class="pipe-desc">Monthly temperature &amp; precipitation from 4 LARI stations (Ammik, Doures, Ras&nbsp;Baalbeck, Tal&nbsp;Amara) spanning 2015&ndash;present. Missing values imputed with climatological medians and flagged.</div>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="pipe-step">
+        <div class="pipe-icon">&#9313;</div>
+        <div class="pipe-title">Feature Engineering</div>
+        <div class="pipe-desc">15 forecast features: De Martonne index, lagged precip &amp; temp (1&ndash;3 months), 3/6/12-month rolling averages, SPI-3, SPI-6, cyclical month encoding (sin/cos). All rollings use shift(1) to prevent leakage.</div>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="pipe-step">
+        <div class="pipe-icon">&#9314;</div>
+        <div class="pipe-title">6 Models Benchmarked</div>
+        <div class="pipe-desc">3 non-AI baselines (Linear Trend, SARIMA, Rule-based) + Random Forest regressor + XGBoost regressor + XGBoost Zone Classifier. Strict temporal split: train 2015&ndash;2021, val 2022, test 2023&rarr;.</div>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="pipe-step">
+        <div class="pipe-icon">&#9315;</div>
+        <div class="pipe-title">REST API &amp; Dashboard</div>
+        <div class="pipe-desc">9 API endpoints serve forecasts, SHAP explanations, leaderboard, and classifier probabilities. The dashboard renders forecasts, 90% conformal intervals, crop viability traffic light, and scientific conclusions. Deployed on Azure.</div>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ Controls ============ -->
   <section class="controls card">
     <div class="control">

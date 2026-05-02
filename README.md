@@ -19,6 +19,21 @@ at four LARI monitoring stations in Lebanon's Bekaa Valley.*
 
 ---
 
+## Key Results — held-out test set (2023–present, 144 samples)
+
+| Model | Task | RMSE | R² | F1 (weighted) | Coverage |
+|---|---|---|---|---|---|
+| Linear Trend | Regression | 20.64 | −0.047 | — | — |
+| SARIMA | Regression | 8.15 | 0.837 | — | — |
+| Rule Baseline | Classification | — | — | 0.816 | — |
+| **Random Forest** | **Regression** | **4.95** | **0.940** | — | **93.8%** |
+| XGBoost | Regression | 5.42 | 0.928 | — | 94.4% |
+| XGBoost Classifier | Classification | — | — | **0.979** | — |
+
+> Random Forest reduces RMSE by **39%** over the best non-AI baseline (SARIMA). Both ML regressors exceed the 90% conformal prediction interval coverage target.
+
+---
+
 ## Abstract
 
 Lebanon's Bekaa Valley is the country's agricultural backbone, generating an estimated **USD 700 million
