@@ -121,6 +121,24 @@ or below the critical DM = 20 wheat viability threshold.
 **Source:** Lebanese Agricultural Research Institute (LARI), four Bekaa Valley stations.  
 **Coverage:** Monthly observations, January 2015 – present (~11 years, 528+ station-months).
 
+#### Raw Data Files
+
+The raw data is provided by LARI as Microsoft Excel files, one per station. Tal Amara is split across multiple sub-files (rain gauge and temperature loggers maintained separately):
+
+```
+Climatic data/
+├── Ammik.xls              ← monthly temp + precip, Ammik station
+├── Doures.xls             ← monthly temp + precip, Doures station
+├── Ras Baalbeck.xls       ← monthly temp + precip, Ras Baalbeck station
+└── Tal Amara/
+    ├── Rain.xls           ← precipitation logger
+    ├── TA1.xls            ← temperature sensor 1
+    ├── TA2.xls            ← temperature sensor 2
+    └── TA3.xls            ← temperature sensor 3
+```
+
+These files are loaded by `data_ingestion/loaders.py`, merged, cleaned in `data_ingestion/cleaners.py`, and the processed output is written to `data/processed/bekaa_valley_clean.csv`. The raw `.xls` files are not committed to the repository as they are proprietary LARI data; contact [lari.gov.lb](http://www.lari.gov.lb/) to obtain them.
+
 | Station | Elevation (m) | Latitude | Longitude |
 |---|---|---|---|
 | Ammik | ~980 | 34.09°N | 35.95°E |
