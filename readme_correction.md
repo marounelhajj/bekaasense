@@ -25,7 +25,7 @@
 | ML method choice + substance | `model_engine/ml_models.py` (RF, XGBoost regressors; XGBoostClassifier with SMOTE-Tomek). Choice justified in `docs/ARCHITECTURE.md` §"Model selection" |
 | Preprocessing / features / **leakage** | `data_ingestion/cleaners.py` (impute + outlier flag), `data_ingestion/features.py` (shift-1 rollings), `tests/test_features.py` (`test_assert_no_leakage_fails_when_shuffled`, `test_forecast_features_do_not_include_target_current_value`) |
 | Splits, metrics, protocol | `data_ingestion/features.py::temporal_split`, `model_engine/evaluate.py`, `model_engine/train.py` (train 2015–2021, val 2022, test 2023→) |
-| Error analysis | `model_engine/evaluate.py::residuals_by_year`, `residuals_by_station`; outputs in `results/metrics/residuals_by_{year,station}.csv` |
+| Error analysis | `model_engine/evaluate.py::residuals_by_year`, `residuals_by_station`; outputs in `results/metrics/residuals_by_{year,station}.csv`; surfaced in dashboard via `/api/residuals/` as grouped bar charts (bias + MAE by station, MAE by year) |
 | Limitations + trade-offs | `docs/LIMITATIONS.md` + `README.md` §"Honest limitations" + dashboard limitations section |
 | Explainability | `model_engine/explainability.py` (SHAP TreeExplainer); API `/api/explain/`; dashboard SHAP chart |
 | Bias / fairness | Per-station residuals (`residuals_by_station.csv`); imputation flags in `data_ingestion/cleaners.py::add_imputation_flags`; station-scope disclaimer in `docs/LIMITATIONS.md` |
@@ -40,7 +40,8 @@
 | Separation of data / model / serving | 4 Django apps: `data_ingestion`, `model_engine`, `api`, `dashboard` — each with a single responsibility |
 | Reproducible env + run path | Pinned `requirements.txt`; `Makefile` targets (`install`, `data`, `train`, `test`, `up`); `random_state=42` throughout |
 | Functional UI / demo flow | `dashboard/` (Django templates + Chart.js dashboard with station selector, forecast chart, confidence band, SHAP chart, viability traffic light) |
-| Running deployed artefact | `docker compose up` starts the stack; `/health/` returns 200; `Dockerfile` HEALTHCHECK directive |
+| Running deployed artefact | `docker compose up` starts the stack; `/health/` returns 200; `Dockerfile` HEALTHCHECK directive; live on Azure at `bekaasense-fqfdedgmdjcvh4g4.francecentral-01.azurewebsites.net` |
+| CI/CD pipeline | `.github/workflows/ci.yml` — lint + synthetic data + train + 17 pytest tests on every push; `.github/workflows/main_bekaasense.yml` — auto-deploy to Azure App Service after CI passes |
 
 ## 4. Documentation
 
@@ -76,4 +77,6 @@
 |------|--------|-------|
 | Edge deployment | Not implemented | Not applicable to a station-level climate-modelling system |
 | Extra robustness dimension | Implemented | All 4 responsible-ML dimensions addressed; interval coverage metric is a second robustness check beyond residual analysis |
-| Extra baselines + explainability | Implemented | Three non-AI baselines (not one), SHAP surfaced in the UI (not just CSV), per-station residual stratification, class-imbalance handling (SMOTE + class_weight="balanced") |
+| Extra baselines + explainability | Implemented | Three non-AI baselines (not one), SHAP surfaced in the UI (not just CSV), per-station residual stratification, class-imbalance handling (SMOTE-Tomek + class_weight="balanced") |
+| Error analysis in dashboard | Implemented | `/api/residuals/` endpoint + two dashboard charts: spatial bias by station (RM2) and temporal drift by year (TM6) — not just CSVs |
+| CI/CD pipeline | Implemented | GitHub Actions: 17 automated tests run on every push before Azure is updated |
