@@ -65,8 +65,9 @@ LARI, FAO Lebanon, and farm cooperatives.
 4. [Conclusions](#4-conclusions)
 5. [Honest Limitations](#5-honest-limitations)
 6. [Quick Start](#6-quick-start)
-7. [API Reference](#7-api-reference)
-8. [System Capabilities](#8-system-capabilities)
+7. [CI/CD Pipeline & Cloud Deployment](#7-cicd-pipeline--cloud-deployment)
+8. [API Reference](#8-api-reference)
+9. [System Capabilities](#9-system-capabilities)
 
 ---
 
@@ -394,7 +395,68 @@ make install && make data && make train && make test && make serve
 
 ---
 
-## 7. API Reference
+## 7. CI/CD Pipeline & Cloud Deployment
+
+Every push to the `main` branch triggers two automated GitHub Actions workflows before the live site is updated.
+
+### Workflow 1 — CI (`ci.yml`)
+
+Runs on every push and pull request. Steps in order:
+
+```
+1. Checkout code
+2. Set up Python 3.11
+3. Install all dependencies (pip install -r requirements.txt)
+4. Lint — python -m compileall (catches syntax errors in all apps)
+5. Generate synthetic dataset (scripts/generate_synthetic.py)
+6. Train all 6 models on synthetic data (python -m model_engine.train)
+7. Run 17 pytest tests across 4 test files
+8. Upload leaderboard.json as a downloadable artifact
+```
+
+The 17 tests cover:
+- **`test_indices.py`** — De Martonne formula correctness, SPI behaviour, zone threshold classification
+- **`test_features.py`** — Temporal split ordering, leakage guardrail (fails if a random split is used), lag feature correctness, forecast feature set does not contain current-step values
+- **`test_baselines.py`** — LinearTrend, SARIMA, and Rule baseline fit and produce finite predictions
+- **`test_api.py`** — `/health/` returns 200, `/api/stations/` returns 503 (not a crash) without data, `/api/predict/` returns 400 for an invalid station
+
+### Workflow 2 — Deploy (`main_bekaasense.yml`)
+
+Runs only after the CI workflow passes. Steps:
+
+```
+1. Build the app (install dependencies in a clean virtualenv)
+2. Upload build artifact
+3. Login to Azure using stored GitHub secrets
+   (client ID, tenant ID, subscription ID — never in the codebase)
+4. Deploy to Azure App Service — Production slot, app name "Bekaasense"
+```
+
+### End-to-end flow
+
+```
+git push origin main
+        │
+        ▼
+GitHub Actions: CI workflow
+  ├── lint → synthetic data → train → 17 tests
+  └── all pass? ──No──▶ pipeline stops, Azure is NOT updated
+                │
+               Yes
+                ▼
+GitHub Actions: Deploy workflow
+  └── build → Azure login → deploy to Production slot
+                │
+                ▼
+Live site updated (~3–5 min total from push)
+https://bekaasense-fqfdedgmdjcvh4g4.francecentral-01.azurewebsites.net
+```
+
+The Azure credentials are stored as GitHub repository secrets and are never present in the codebase or commit history.
+
+---
+
+## 8. API Reference
 
 Base URL: `https://bekaasense-fqfdedgmdjcvh4g4.francecentral-01.azurewebsites.net`
 
@@ -419,7 +481,7 @@ curl -X POST https://bekaasense-fqfdedgmdjcvh4g4.francecentral-01.azurewebsites.
 
 ---
 
-## 8. System Capabilities
+## 9. System Capabilities
 
 ### What is implemented
 
