@@ -62,12 +62,15 @@
 | Beyond the minimum | **3** baselines (not 1); SHAP explainability; conformal prediction intervals with coverage guarantee; crop-viability traffic light; SMOTE-Tomek + class-weighted XGBoostClassifier (RF and XGB both trained, best kept); Mann–Kendall honest disclosure; decision guide + scientific conclusions on dashboard; model health check system |
 | Purposeful polish | Non-root Docker user; multi-stage image; healthcheck; CORS config; whitenoise static serving; env-driven settings; full test suite with leakage guardrail |
 
-## 6. What Is Not Implemented
+## 6. Extra Features & Scope
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Edge deployment | Not implemented | Not applicable to a station-level climate-modelling system |
-| Extra robustness dimension | Implemented | All 4 responsible-ML dimensions addressed; interval coverage metric is a second robustness check beyond residual analysis |
-| Extra baselines + explainability | Implemented | Three non-AI baselines (not one), SHAP surfaced in the UI (not just CSV), per-station residual stratification, class-imbalance handling (SMOTE-Tomek + class_weight="balanced") |
-| Error analysis in dashboard | Implemented | `/api/residuals/` endpoint + two dashboard charts: spatial bias by station (RM2) and temporal drift by year (TM6) — not just CSVs |
-| CI/CD pipeline | Implemented | GitHub Actions: 17 automated tests run on every push before Azure is updated |
+| Feature | Notes |
+|---------|-------|
+| All 4 Responsible-ML dimensions | Explainability (SHAP), Fairness/bias (per-station residuals), Privacy (leakage guardrail), Robustness (conformal intervals + model health check) |
+| Three non-AI baselines | LinearTrend, SARIMA, Rule-based — not just one |
+| SHAP in the UI | Interactive bar chart in dashboard, not just a CSV |
+| Error analysis in dashboard | `/api/residuals/` + two charts: spatial bias by station and temporal drift by year |
+| CI/CD pipeline | GitHub Actions: 17 automated tests on every push before Azure deploys |
+| Edge deployment | Not applicable to a station-level climate-modelling system — not implemented |
+| Real-time data ingestion | LARI has no public API — not implemented |
+| Spatial interpolation | Only 4 stations, no grid coverage — not implemented |
