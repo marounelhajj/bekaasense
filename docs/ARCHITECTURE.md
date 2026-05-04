@@ -141,9 +141,9 @@ number so the reader can judge for themselves.
 - **XGBoost** is the secondary regressor: typically wins on tabular
   data but harder to calibrate uncertainty for. Kept for comparison
   and possible ensembling.
-- **Random Forest classifier with class weighting + SMOTE** handles the
-  severe class imbalance surfaced during EDA (Hyper-arid months dominate
-  ~80% of observations).
+- **XGBoost classifier with SMOTE-Tomek + class_weight="balanced"** handles the
+  severe class imbalance surfaced during EDA. Both RF and XGBoost classifiers
+  were trained; XGBoost was selected by macro-F1 on the validation set (F1=0.974).
 
 ## Deployment audience
 

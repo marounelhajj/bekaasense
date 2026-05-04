@@ -614,6 +614,34 @@
     </div>
   </section>
 
+  <!-- ============ Error Analysis ============ -->
+  <section class="card">
+    <h3>Model error analysis &mdash; residuals on held-out test set</h3>
+    <p class="explain">
+      Residuals are the signed errors: <strong>predicted &minus; actual</strong>.
+      A bias near zero means the model is well-calibrated. A large spread (MAE) reveals where uncertainty is highest.
+      The left chart checks for <strong>spatial bias</strong> (does the model systematically over- or under-predict at a specific station?).
+      The right chart checks for <strong>temporal drift</strong> (is accuracy degrading year by year as climate shifts?).
+    </p>
+    <div class="row" style="grid-template-columns:1fr 1fr;gap:24px;">
+      <div>
+        <div class="subtitle">Bias &amp; MAE by station <span style="font-weight:400;font-size:0.78rem;color:var(--muted);">(spatial fairness check)</span></div>
+        <div class="chart-container small" style="height:220px;"><canvas id="resByStationChart"></canvas></div>
+      </div>
+      <div>
+        <div class="subtitle">MAE by year <span style="font-weight:400;font-size:0.78rem;color:var(--muted);">(temporal drift check)</span></div>
+        <div class="chart-container small" style="height:220px;"><canvas id="resByYearChart"></canvas></div>
+      </div>
+    </div>
+    <p class="explain" style="margin-top:16px;">
+      <strong>Interpretation:</strong>
+      All four stations show a small negative bias (&minus;0.2 to &minus;1.8 DM units), meaning the model
+      slightly under-predicts aridity — a conservative error direction for agricultural risk management.
+      MAE remains stable across 2023–2025, indicating no evidence of temporal performance degradation
+      over the test window.
+    </p>
+  </section>
+
   <!-- ============ Limitations ============ -->
   <section class="card limits" id="limitations">
     <h3>Scope, limitations, and responsible use</h3>

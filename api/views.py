@@ -305,6 +305,18 @@ def scoring(request):
 
 
 @api_view(["GET"])
+def residuals(request):
+    """Return residual analysis by station and by year for error-analysis charts."""
+    by_station = METRICS / "residuals_by_station.csv"
+    by_year    = METRICS / "residuals_by_year.csv"
+    if not by_station.exists() or not by_year.exists():
+        return Response({"detail": "No residuals. Run `make train`."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    s = pd.read_csv(by_station).round(3).to_dict(orient="records")
+    y = pd.read_csv(by_year).round(3).to_dict(orient="records")
+    return Response({"by_station": s, "by_year": y})
+
+
+@api_view(["GET"])
 def latest_zone(request):
     """Return the classifier's prediction + probabilities for the latest
     observation of a given station. Exposes the AridityZoneClassifier output

@@ -2,6 +2,7 @@
 const $ = (id) => document.getElementById(id);
 let trendChart = null, shapChart = null, clfChart = null, fclfChart = null;
 let rmseChart = null, r2Chart = null, scatterChart = null;
+let resByStationChart = null, resByYearChart = null;
 
 function zoneFromDM(dm) {
   if (dm < 5)  return "Hyper-arid";
@@ -364,6 +365,47 @@ async function renderScatterPlot() {
   });
 }
 
+async function renderResiduals() {
+  let data;
+  try { data = await fetchJSON("/api/residuals/"); } catch(e) { return; }
+
+  const axisStyle = { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { font: { size: 11 } } };
+
+  // By station — grouped bar: bias + MAE
+  const stations = data.by_station || [];
+  const sLabels = stations.map(r => r.station);
+  const sBias   = stations.map(r => parseFloat(r.mean.toFixed(2)));
+  const sMAE    = stations.map(r => parseFloat(r.mae.toFixed(2)));
+  if (resByStationChart) resByStationChart.destroy();
+  resByStationChart = new Chart($("resByStationChart").getContext("2d"), {
+    type: "bar",
+    data: { labels: sLabels, datasets: [
+      { label: "Bias (mean residual)", data: sBias, backgroundColor: "rgba(193,68,14,0.65)", borderColor: "#c1440e", borderWidth: 1.5, borderRadius: 3 },
+      { label: "MAE", data: sMAE, backgroundColor: "rgba(107,142,35,0.65)", borderColor: "#4a6e14", borderWidth: 1.5, borderRadius: 3 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toFixed(2)} DM` } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 11 } } }, y: { ...axisStyle, title: { display: true, text: "DM units" } } } }
+  });
+
+  // By year — MAE line
+  const years = data.by_year || [];
+  const yLabels = years.map(r => String(r.year));
+  const yMAE    = years.map(r => parseFloat(r.mae.toFixed(2)));
+  if (resByYearChart) resByYearChart.destroy();
+  resByYearChart = new Chart($("resByYearChart").getContext("2d"), {
+    type: "bar",
+    data: { labels: yLabels, datasets: [
+      { label: "MAE", data: yMAE, backgroundColor: "rgba(58,124,165,0.65)", borderColor: "#3a7ca5", borderWidth: 1.5, borderRadius: 3 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ` MAE: ${c.parsed.y.toFixed(2)} DM` } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 11 } } }, y: { ...axisStyle, beginAtZero: true, title: { display: true, text: "MAE (DM units)" } } } }
+  });
+}
+
 async function refresh() {
   const station = $("station").value;
   const tmEl = $("target_month");
@@ -381,5 +423,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderScoringMetrics();
   renderComparisonCharts();
   renderScatterPlot();
+  renderResiduals();
   refresh();
 });

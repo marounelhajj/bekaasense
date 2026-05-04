@@ -12,4 +12,5 @@ urlpatterns = [
     path("scoring/", views.scoring, name="scoring"),
     path("test_predictions/", views.test_predictions, name="test_predictions"),
     path("latest_zone/", views.latest_zone, name="latest_zone"),
+    path("residuals/", views.residuals, name="residuals"),
 ]

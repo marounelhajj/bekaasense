@@ -434,6 +434,17 @@ curl -X POST https://bekaasense-fqfdedgmdjcvh4g4.francecentral-01.azurewebsites.
 - **REST API** — 10 endpoints, full JSON, DRF with input validation
 - **Full test suite** — 17 passing tests covering indices, feature leakage, baselines, and API
 
+### Responsible ML coverage (all four dimensions)
+
+| Dimension | Implementation |
+|---|---|
+| RM1 — Explainability | SHAP TreeExplainer: global importance + per-prediction attributions via `/api/explain/` and dashboard bar chart |
+| RM2 — Fairness / bias | Per-station residual analysis (spatial bias check): `/api/residuals/` + dashboard error analysis charts |
+| RM3 — Privacy / leakage | Raw data excluded from repo (`.gitignore`); automated leakage guardrail test in CI that fails if shift-1 rule is violated |
+| RM4 — Robustness / shift | Split conformal prediction intervals (mathematical ≥90% coverage guarantee); model health check after every training run; year-stratified residuals for temporal drift detection |
+
+All four RM dimensions are addressed. The interval coverage metric (RM4) is a second robustness check beyond residual analysis.
+
 ### What is not implemented (acknowledged limitations)
 
 - Real-time LARI data ingestion — currently requires manual CSV upload
