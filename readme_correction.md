@@ -53,16 +53,7 @@
 | Results / logs / ablations | `results/metrics/leaderboard.csv`, `results/metrics/test_predictions.csv`, `results/metrics/shap_importance.csv`, residual CSVs, logger output in `bekaasense.settings::LOGGING` |
 | Data sources + limitations + deployment notes | `docs/DATA.md`, `docs/LIMITATIONS.md`, `README.md` |
 
-## 5. Presentation
-
-| Criterion | Prep file |
-|-----------|-----------|
-| Problem framing clarity | `docs/LIMITATIONS.md` + problem formulation §1 |
-| Method / architecture explanation | `docs/ARCHITECTURE.md` |
-| Results / demo / visuals | Live dashboard at `/` + `results/metrics/leaderboard.csv` |
-| Q&A + ownership | Team preparation — not a repo artefact |
-
-## 6. Creativity & Initiative
+## 5. Creativity & Initiative
 
 | Criterion | Evidence |
 |-----------|----------|
@@ -71,7 +62,7 @@
 | Beyond the minimum | **3** baselines (not 1); SHAP explainability; conformal prediction intervals with coverage guarantee; crop-viability traffic light; SMOTE-Tomek + class-weighted XGBoostClassifier (RF and XGB both trained, best kept); Mann–Kendall honest disclosure; decision guide + scientific conclusions on dashboard; model health check system |
 | Purposeful polish | Non-root Docker user; multi-stage image; healthcheck; CORS config; whitenoise static serving; env-driven settings; full test suite with leakage guardrail |
 
-## 7. What Is Not Implemented
+## 6. What Is Not Implemented
 
 | Item | Status | Notes |
 |------|--------|-------|
